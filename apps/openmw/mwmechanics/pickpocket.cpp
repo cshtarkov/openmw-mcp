@@ -30,27 +30,9 @@ namespace MWMechanics
 
     bool Pickpocket::getDetected(float valueTerm)
     {
-        float x = getChanceModifier(mThief);
-        float y = getChanceModifier(mVictim, valueTerm);
-
-        float t = 2*x - y;
-
-        float pcSneak = static_cast<float>(mThief.getClass().getSkill(mThief, ESM::Skill::Sneak));
-        int iPickMinChance = MWBase::Environment::get().getWorld()->getStore().get<ESM::GameSetting>()
-                .find("iPickMinChance")->getInt();
-        int iPickMaxChance = MWBase::Environment::get().getWorld()->getStore().get<ESM::GameSetting>()
-                .find("iPickMaxChance")->getInt();
-
+        int pcSneak = mThief.getClass().getSkill(mThief, ESM::Skill::Sneak);
         int roll = Misc::Rng::roll0to99();
-        if (t < pcSneak / iPickMinChance)
-        {
-            return (roll > int(pcSneak / iPickMinChance));
-        }
-        else
-        {
-            t = std::min(float(iPickMaxChance), t);
-            return (roll > int(t));
-        }
+        return roll < pcSneak;
     }
 
     bool Pickpocket::pick(MWWorld::Ptr item, int count)
