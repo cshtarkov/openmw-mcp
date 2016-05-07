@@ -228,7 +228,7 @@ namespace MWWorld
         {
             MWMechanics::CreatureStats &stats = toActivate.getClass().getCreatureStats(toActivate);
 
-            if (stats.getAiSequence().isInCombat() && !stats.isDead())
+            if (stats.getAiSequence().isInCombat() && !stats.isDead() && !stats.getKnockedDown())
                 return;
         }
 
