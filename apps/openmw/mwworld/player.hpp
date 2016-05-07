@@ -51,6 +51,7 @@ namespace MWWorld
         MWMechanics::AttributeValue mSaveAttributes[ESM::Attribute::Length];
 
         bool mAttackingOrSpell;
+        bool mSwiftCasting;
 
     public:
 
@@ -105,6 +106,8 @@ namespace MWWorld
 
         void setAttackingOrSpell(bool attackingOrSpell);
         bool getAttackingOrSpell() const;
+        void setSwiftCasting(bool swiftCasting);
+        bool getSwiftCasting() const;
 
         ///Checks all nearby actors to see if anyone has an aipackage against you
         bool isInCombat();

@@ -188,6 +188,7 @@ class CharacterController : public MWRender::Animation::TextKeyListener
     std::string mAttackType; // slash, chop or thrust
 
     bool mAttackingOrSpell;
+    bool mSwiftCasting;
 
     void setAttackTypeBasedOnMovement();
     void setAttackTypeRandomly();
@@ -247,6 +248,7 @@ public:
     bool isSneaking() const;
 
     void setAttackingOrSpell(bool attackingOrSpell);
+    void setSwiftCasting(bool swiftCasting);
 
     bool readyToPrepareAttack() const;
     bool readyToStartAttack() const;

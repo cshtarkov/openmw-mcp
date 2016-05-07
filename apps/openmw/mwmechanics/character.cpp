@@ -679,6 +679,7 @@ CharacterController::CharacterController(const MWWorld::Ptr &ptr, MWRender::Anim
     , mSecondsOfRunning(0)
     , mTurnAnimationThreshold(0)
     , mAttackingOrSpell(false)
+    , mSwiftCasting(false)
 {
     if(!mAnimation)
         return;
@@ -1010,7 +1011,7 @@ bool CharacterController::updateCreatureState()
                 else
                     mCurrentWeapon = "";
             }
-            if (weapType != WeapType_Spell || !mAnimation->hasAnimation("spellcast")) // Not all creatures have a dedicated spellcast animation
+            if ((weapType != WeapType_Spell || !mAnimation->hasAnimation("spellcast"))) // Not all creatures have a dedicated spellcast animation
             {
                 int roll = Misc::Rng::rollDice(3); // [0, 2]
                 if (roll == 0)
@@ -1184,13 +1185,14 @@ bool CharacterController::updateWeaponState()
 
     float complete;
     bool animPlaying;
+    std::string previousWeapon; // mCurrentWeapon may change if swiftcasting, this is needed to revert it
     if(mAttackingOrSpell)
     {
-        if(mUpperBodyState == UpperCharState_WeapEquiped && (mHitState == CharState_None || mHitState == CharState_Block))
+        if((mUpperBodyState == UpperCharState_WeapEquiped && (mHitState == CharState_None || mHitState == CharState_Block)) || mSwiftCasting)
         {
             MWBase::Environment::get().getWorld()->breakInvisibility(mPtr);
             mAttackType.clear();
-            if(mWeaponType == WeapType_Spell)
+            if(mWeaponType == WeapType_Spell || mSwiftCasting == true)
             {
                 // Unset casting flag, otherwise pressing the mouse button down would
                 // continue casting every frame if there is no animation
@@ -1198,6 +1200,14 @@ bool CharacterController::updateWeaponState()
                 if (mPtr == getPlayer())
                 {
                     MWBase::Environment::get().getWorld()->getPlayer().setAttackingOrSpell(false);
+                }
+
+                if (mPtr == getPlayer() && mSwiftCasting == true)
+                {
+                    // Inject "spellcast" as the current weapon to swiftcast,
+                    // will get reverted later.
+                    previousWeapon = mCurrentWeapon;
+                    mCurrentWeapon = "spellcast";
                 }
 
                 const MWWorld::ESMStore &store = MWBase::Environment::get().getWorld()->getStore();
@@ -1311,10 +1321,20 @@ bool CharacterController::updateWeaponState()
         animPlaying = mAnimation->getInfo(mCurrentWeapon, &complete);
         if(mUpperBodyState == UpperCharState_MinAttackToMaxAttack && mHitState != CharState_KnockDown)
             mAttackStrength = complete;
+
+        if (mPtr == getPlayer() && mSwiftCasting == true)
+        {
+            // Revert to previous weapon if swiftcasting
+            // and unset flag.
+            mSwiftCasting = false;
+            MWBase::Environment::get().getWorld()->getPlayer().setSwiftCasting(false);
+            mCurrentWeapon = previousWeapon;
+        }
     }
     else
     {
         animPlaying = mAnimation->getInfo(mCurrentWeapon, &complete);
+
         if(mUpperBodyState == UpperCharState_MinAttackToMaxAttack && mHitState != CharState_KnockDown)
         {
             float attackStrength = complete;
@@ -2116,6 +2136,12 @@ void CharacterController::setAttackingOrSpell(bool attackingOrSpell)
 {
     mAttackingOrSpell = attackingOrSpell;
 }
+
+void CharacterController::setSwiftCasting(bool swiftCasting)
+{
+    mSwiftCasting = swiftCasting;
+}
+
 
 bool CharacterController::readyToPrepareAttack() const
 {

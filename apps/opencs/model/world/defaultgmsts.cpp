@@ -1472,6 +1472,7 @@ const char * CSMWorld::DefaultGmsts::Strings[CSMWorld::DefaultGmsts::StringCount
     "sStrip",
     "sSubtitles",
     "sSystemMenuXbox",
+    "sSwiftCast",
     "sTake",
     "sTakeAll",
     "sTargetCriticalStrike",

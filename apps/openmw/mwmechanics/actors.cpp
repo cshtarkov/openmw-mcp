@@ -991,7 +991,10 @@ namespace MWMechanics
                 iter->second->getCharacterController()->setActive(inProcessingRange);
 
                 if (iter->first == player)
+                {
                     iter->second->getCharacterController()->setAttackingOrSpell(MWBase::Environment::get().getWorld()->getPlayer().getAttackingOrSpell());
+                    iter->second->getCharacterController()->setSwiftCasting(MWBase::Environment::get().getWorld()->getPlayer().getSwiftCasting());
+                }
 
                 if (!iter->first.getClass().getCreatureStats(iter->first).isDead())
                 {

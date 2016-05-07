@@ -466,7 +466,7 @@ namespace MWGui
         else
             actions = MWBase::Environment::get().getInputManager()->getActionControllerSorting();
 
-        const int h = 18;
+        const int h = 19; // Magic, hard-coded number - number of actions
         const int w = mControlsBox->getWidth() - 28;
         int curH = 0;
         for (std::vector<int>::const_iterator it = actions.begin(); it != actions.end(); ++it)

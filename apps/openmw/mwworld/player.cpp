@@ -35,7 +35,8 @@ namespace MWWorld
         mTeleported(false),
         mCurrentCrimeId(-1),
         mPaidCrimeId(-1),
-        mAttackingOrSpell(false)
+        mAttackingOrSpell(false),
+        mSwiftCasting(false)
     {
         ESM::CellRef cellRef;
         cellRef.blank();
@@ -252,6 +253,16 @@ namespace MWWorld
     bool Player::getAttackingOrSpell() const
     {
         return mAttackingOrSpell;
+    }
+
+    void Player::setSwiftCasting(bool swiftCasting)
+    {
+        mSwiftCasting = swiftCasting;
+    }
+
+    bool Player::getSwiftCasting() const
+    {
+        return mSwiftCasting;
     }
 
     bool Player::isInCombat() {

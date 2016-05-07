@@ -163,12 +163,12 @@ namespace MWInput
 
     void InputManager::setPlayerControlsEnabled(bool enabled)
     {
-        int nPlayerChannels = 17;
+        int nPlayerChannels = 18;
         int playerChannels[] = {A_Activate, A_AutoMove, A_AlwaysRun, A_ToggleWeapon,
                                 A_ToggleSpell, A_Rest, A_QuickKey1, A_QuickKey2,
                                 A_QuickKey3, A_QuickKey4, A_QuickKey5, A_QuickKey6,
                                 A_QuickKey7, A_QuickKey8, A_QuickKey9, A_QuickKey10,
-                               A_Use};
+                                A_Use, A_SwiftCast};
 
         for(int i = 0; i < nPlayerChannels; i++) {
             int pc = playerChannels[i];
@@ -212,6 +212,11 @@ namespace MWInput
                 mPlayer->setAttackingOrSpell(currentValue != 0);
             else if (action == A_Jump)
                 mAttemptJump = (currentValue == 1.0 && previousValue == 0.0);
+            else if (action == A_SwiftCast)
+            {
+                mPlayer->setSwiftCasting(currentValue != 0);
+                mPlayer->setAttackingOrSpell(currentValue != 0);
+            }
         }
 
         if (currentValue == 1)
@@ -1159,6 +1164,7 @@ namespace MWInput
         defaultKeyBindings[A_AlwaysRun] = SDL_SCANCODE_CAPSLOCK;
         defaultKeyBindings[A_QuickSave] = SDL_SCANCODE_F5;
         defaultKeyBindings[A_QuickLoad] = SDL_SCANCODE_F9;
+        defaultKeyBindings[A_SwiftCast] = SDL_SCANCODE_Z;
 
         std::map<int, int> defaultMouseButtonBindings;
         defaultMouseButtonBindings[A_Inventory] = SDL_BUTTON_RIGHT;
@@ -1312,6 +1318,7 @@ namespace MWInput
         descriptions[A_AlwaysRun] = "sAlways_Run";
         descriptions[A_QuickSave] = "sQuickSaveCmd";
         descriptions[A_QuickLoad] = "sQuickLoadCmd";
+        descriptions[A_SwiftCast] = "sEffectSwiftSwim";
 
         if (descriptions[action] == "")
             return ""; // not configurable
@@ -1423,6 +1430,7 @@ namespace MWInput
         ret.push_back(A_Sneak);
         ret.push_back(A_Activate);
         ret.push_back(A_Use);
+        ret.push_back(A_SwiftCast);
         ret.push_back(A_ToggleWeapon);
         ret.push_back(A_ToggleSpell);
         ret.push_back(A_CycleSpellLeft);
@@ -1459,6 +1467,7 @@ namespace MWInput
         ret.push_back(A_Sneak);
         ret.push_back(A_Activate);
         ret.push_back(A_Use);
+        ret.push_back(A_SwiftCast);
         ret.push_back(A_ToggleWeapon);
         ret.push_back(A_ToggleSpell);
         ret.push_back(A_AutoMove);

@@ -309,6 +309,8 @@ namespace MWInput
             A_MoveForwardBackward,
             A_MoveLeftRight,
 
+            A_SwiftCast, // For casting a spell without readying first
+
             A_Last            // Marker for the last item
         };
     };
