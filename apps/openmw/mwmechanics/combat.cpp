@@ -372,8 +372,12 @@ namespace MWMechanics
         const MWWorld::ESMStore& store = MWBase::Environment::get().getWorld()->getStore();
         float minstrike = store.get<ESM::GameSetting>().find("fMinHandToHandMult")->getFloat();
         float maxstrike = store.get<ESM::GameSetting>().find("fMaxHandToHandMult")->getFloat();
+        // Damage now depends on strength of attacker, according to MCP's formula
+        float strength = static_cast<float>(attacker.getClass().getCreatureStats(attacker).getAttribute(ESM::Attribute::Strength).getModified());
+        float strengthModifier = strength / 40.f;
         damage  = static_cast<float>(attacker.getClass().getSkill(attacker, ESM::Skill::HandToHand));
         damage *= minstrike + ((maxstrike-minstrike)*attackStrength);
+        damage *= strengthModifier;
 
         MWMechanics::CreatureStats& otherstats = victim.getClass().getCreatureStats(victim);
         healthdmg = otherstats.isParalyzed()
