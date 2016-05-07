@@ -1,107 +1,70 @@
-OpenMW
-======
+OpenMW-MCP
+==========
 
-[![Build Status](https://api.travis-ci.org/OpenMW/openmw.svg)](https://travis-ci.org/OpenMW/openmw) [![Build status](https://ci.appveyor.com/api/projects/status/e6bqw8oouy8ufd46?svg=true)](https://ci.appveyor.com/project/scrawl/openmw)  [![Coverity Scan Build Status](https://scan.coverity.com/projects/3740/badge.svg)](https://scan.coverity.com/projects/3740)
+This is a fork of [https://github.com/OpenMW/openmw](OpenMW).
 
-OpenMW is a recreation of the engine for the popular role-playing game Morrowind by Bethesda Softworks. You need to own and install the original game for OpenMW to work.
+OpenMW is a free implementation of The Elder Scrolls III: Morrowind's
+game engine that is compatible with the original game files and many
+of the community-created mods.
 
-OpenMW also comes with OpenMW-CS, a replacement for Morrowind's TES Construction Set.
+**OpenMW-MCP** is a fork that implements some features provided by the
+[http://www.uesp.net/wiki/Tes3Mod:Morrowind_Code_Patch](Morrowind Code
+Patch) on top of OpenMW. A lot of the functionality of the MCP is just
+bugfixes for the vanilla engine. These are not a problem for OpenMW as
+it simply didn't implement those bugs. However, MCP also added some
+original features, which will probably not find their way into OpenMW
+as it tries to keep close to vanilla Morrowind.
 
-* Version: 0.39.0
-* License: GPL (see docs/license/GPL3.txt for more information)
-* Website: http://www.openmw.org
-* IRC: #openmw on irc.freenode.net
+## Features
 
-Font Licenses:
-* DejaVuLGCSansMono.ttf: custom (see docs/license/DejaVu Font License.txt for more information)
+Here is a list of features that this fork currently implements:
 
-Current Status
---------------
+- *Swiftcasting*. The ability to cast a spell immediately despite the
+  player not having their hands ready for spellcasting. The button for
+  swiftcasting should be set in `Settings -> Controls`, the default is `Z`.
+- *Fairer pickpocketing*. The formula for calculating the chance of
+  getting caught when pickpocketing an item is broken and can result
+  in negative values. It is replaces with a simpler one that just
+  takes the player's Sneak skill into account.
+- *Pickpocketing knocked out NPCs*.
+- *Hidden traps*. Trapped doors and containers will not say they are
+  trapped unless your Security skill is high enough. At skill 0 all
+  traps will be invisible to the player, at skill 100 none will be.
+- *Spellmaking ranges*. When creating spells, the magnitude of spells
+  has been increased to 500 from 100 (so it's more useful for effects
+  like Feather), and the duration has been decreased from 1440 to 300.
+  The latter makes the slider behave more smoothly.
+- *Strength-based hand-to-hand damage*. The original game only takes
+  the attacker's hand-to-hand skill into account when calculating
+  damage. MCP also takes into account their Strength by applying a
+  modifier: 1.0x at Strength 40, 2.5x at Strength 100.
+- *Detect Animal detects all life*. This just makes it detect NPCs as
+  well as creatures.
 
-The main quests in Morrowind, Tribunal and Bloodmoon are all completable. Some issues with side quests are to be expected (but rare). Check the [bug tracker](https://bugs.openmw.org/versions/21) for a list of issues we need to resolve before the "1.0" release. Even before the "1.0" release however, OpenMW boasts some new [features](https://wiki.openmw.org/index.php?title=Features), such as improved graphics and user interfaces. 
+## FAQ
 
-Pre-existing modifications created for the original Morrowind engine can be hit-and-miss. The OpenMW script compiler performs more thorough error-checking than Morrowind does, meaning that a mod created for Morrowind may not necessarily run in OpenMW. Some mods also rely on quirky behaviour or engine bugs in order to work. We are considering such compatibility issues on a case-by-case basis - in some cases adding a workaround to OpenMW may be feasible, in other cases fixing the mod will be the only option. If you know of any mods that work or don't work, feel free to add them to the [Mod status](https://wiki.openmw.org/index.php?title=Mod_status) wiki page.
+### Are there ready-made builds of OpenMW-MCP?
 
-Getting Started
----------------
+No.
 
-* [Official forums](https://forum.openmw.org/)
-* [Installation instructions](https://wiki.openmw.org/index.php?title=Installation_Instructions)
-* [Build from source](https://wiki.openmw.org/index.php?title=Development_Environment_Setup)
-* [Testing the game](https://wiki.openmw.org/index.php?title=Testing)
-* [How to contribute](https://wiki.openmw.org/index.php?title=Contribution_Wanted)
-* [Report a bug](http://bugs.openmw.org/projects/openmw) - read the [guidelines](https://wiki.openmw.org/index.php?title=Bug_Reporting_Guidelines) before submitting your first bug!
-* [Known issues](http://bugs.openmw.org/projects/openmw/issues?utf8=%E2%9C%93&set_filter=1&f%5B%5D=status_id&op%5Bstatus_id%5D=%3D&v%5Bstatus_id%5D%5B%5D=7&f%5B%5D=tracker_id&op%5Btracker_id%5D=%3D&v%5Btracker_id%5D%5B%5D=1&f%5B%5D=&c%5B%5D=project&c%5B%5D=tracker&c%5B%5D=status&c%5B%5D=priority&c%5B%5D=subject&c%5B%5D=assigned_to&c%5B%5D=updated_on&group_by=tracker)
+Your best bet is to clone this repository and build it.
+See [https://wiki.openmw.org/index.php?title=Development_Environment_Setup]().
 
-The data path
--------------
+Don't forget to checkout the `mcp` branch before building to get the
+MCP features.
 
-The data path tells OpenMW where to find your Morrowind files. If you run the launcher, OpenMW should be able to pick up the location of these files on its own, if both Morrowind and OpenMW are installed properly (installing Morrowind under WINE is considered a proper install).
+### Can I use only some of these features?
 
-Command line options
---------------------
+Yes, if you clone this repository and revert the unneeded commits.
+Alternatively, extract the required commits as patches and apply them
+to OpenMW's master branch before building.
 
-    Syntax: openmw <options>
-    Allowed options:
-      --help                                print help message
-      --version                             print version information and quit
-      --data arg (=data)                    set data directories (later directories
-                                            have higher priority)
-      --data-local arg                      set local data directory (highest
-                                            priority)
-      --fallback-archive arg (=fallback-archive)
-                                            set fallback BSA archives (later
-                                            archives have higher priority)
-      --resources arg (=resources)          set resources directory
-      --start arg                           set initial cell
-      --content arg                         content file(s): esm/esp, or
-                                            omwgame/omwaddon
-      --no-sound [=arg(=1)] (=0)            disable all sounds
-      --script-verbose [=arg(=1)] (=0)      verbose script output
-      --script-all [=arg(=1)] (=0)          compile all scripts (excluding dialogue
-                                            scripts) at startup
-      --script-all-dialogue [=arg(=1)] (=0) compile all dialogue scripts at startup
-      --script-console [=arg(=1)] (=0)      enable console-only script
-                                            functionality
-      --script-run arg                      select a file containing a list of
-                                            console commands that is executed on
-                                            startup
-      --script-warn [=arg(=1)] (=1)         handling of warnings when compiling
-                                            scripts
-                                            0 - ignore warning
-                                            1 - show warning but consider script as
-                                            correctly compiled anyway
-                                            2 - treat warnings as errors
-      --script-blacklist arg                ignore the specified script (if the use
-                                            of the blacklist is enabled)
-      --script-blacklist-use [=arg(=1)] (=1)
-                                            enable script blacklisting
-      --load-savegame arg                   load a save game file on game startup
-                                            (specify an absolute filename or a
-                                            filename relative to the current
-                                            working directory)
-      --skip-menu [=arg(=1)] (=0)           skip main menu on game startup
-      --new-game [=arg(=1)] (=0)            run new game sequence (ignored if
-                                            skip-menu=0)
-      --fs-strict [=arg(=1)] (=0)           strict file system handling (no case
-                                            folding)
-      --encoding arg (=win1252)             Character encoding used in OpenMW game
-                                            messages:
+### How does this relate to OpenMW?
 
-                                            win1250 - Central and Eastern European
-                                            such as Polish, Czech, Slovak,
-                                            Hungarian, Slovene, Bosnian, Croatian,
-                                            Serbian (Latin script), Romanian and
-                                            Albanian languages
+I'm not involved with OpenMW development at all. This fork is
+something I do on my own.
 
-                                            win1251 - Cyrillic alphabet such as
-                                            Russian, Bulgarian, Serbian Cyrillic
-                                            and other languages
+### I built OpenMW-MCP, but I don't see any of the MCP features.
 
-                                            win1252 - Western European (Latin)
-                                            alphabet, used by default
-      --fallback arg                        fallback values
-      --no-grab                             Don't grab mouse cursor
-      --export-fonts [=arg(=1)] (=0)        Export Morrowind .fnt fonts to PNG
-                                            image and XML file in current directory
-      --activate-dist arg (=-1)             activation distance override
+Make sure you checkout `mcp` branch before building. The `master`
+branch is identical to upstream `master`.
