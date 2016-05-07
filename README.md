@@ -1,15 +1,15 @@
 OpenMW-MCP
 ==========
 
-This is a fork of [https://github.com/OpenMW/openmw](OpenMW).
+This is a fork of [OpenMW](https://github.com/OpenMW/openmw).
 
 OpenMW is a free implementation of The Elder Scrolls III: Morrowind's
 game engine that is compatible with the original game files and many
 of the community-created mods.
 
 **OpenMW-MCP** is a fork that implements some features provided by the
-[http://www.uesp.net/wiki/Tes3Mod:Morrowind_Code_Patch](Morrowind Code
-Patch) on top of OpenMW. A lot of the functionality of the MCP is just
+[Morrowind Code Patch](http://www.uesp.net/wiki/Tes3Mod:Morrowind_Code_Patch)
+on top of OpenMW. A lot of the functionality of the MCP is just
 bugfixes for the vanilla engine. These are not a problem for OpenMW as
 it simply didn't implement those bugs. However, MCP also added some
 original features, which will probably not find their way into OpenMW
@@ -48,7 +48,7 @@ Here is a list of features that this fork currently implements:
 No.
 
 Your best bet is to clone this repository and build it.
-See [https://wiki.openmw.org/index.php?title=Development_Environment_Setup]().
+See [Development Environment Setup](https://wiki.openmw.org/index.php?title=Development_Environment_Setup).
 
 Don't forget to checkout the `mcp` branch before building to get the
 MCP features.
