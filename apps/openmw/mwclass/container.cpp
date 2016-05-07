@@ -2,6 +2,7 @@
 
 #include <components/esm/loadcont.hpp>
 #include <components/esm/containerstate.hpp>
+#include <components/misc/rng.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
@@ -235,7 +236,15 @@ namespace MWClass
         else if (ptr.getCellRef().getLockLevel() < 0)
             text += "\n#{sUnlocked}";
         if (ptr.getCellRef().getTrap() != "")
-            text += "\n#{sTrapped}";
+        {
+            static int roll;
+            if (roll == 0)
+                roll = Misc::Rng::roll0to99() + 1;
+            MWWorld::Ptr playerPtr = MWBase::Environment::get().getWorld()->getPlayerPtr();
+            int security = playerPtr.getClass().getSkill(playerPtr, ESM::Skill::Security);
+            if (security + 1 > roll)
+                text += "\n#{sTrapped}";
+        }
 
         if (MWBase::Environment::get().getWindowManager()->getFullHelp()) {
             text += MWGui::ToolTips::getCellRefString(ptr.getCellRef());
