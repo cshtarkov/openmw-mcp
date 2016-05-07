@@ -2914,16 +2914,9 @@ namespace MWWorld
         {
             if (mType == World::Detect_Creature)
             {
-                // If in werewolf form, this detects only NPCs, otherwise only creatures
-                if (detector.getClass().isNpc() && detector.getClass().getNpcStats(detector).isWerewolf())
-                {
-                    if (ptr.getClass().getTypeName() != typeid(ESM::NPC).name())
-                        return false;
-                }
-                else if (ptr.getClass().getTypeName() != typeid(ESM::Creature).name())
-                    return false;
-
-                if (ptr.getClass().getCreatureStats(ptr).isDead())
+                // Always detect both NPCs and creatures
+                if (ptr.getClass().getTypeName() != typeid(ESM::NPC).name() &&
+                    ptr.getClass().getTypeName() != typeid(ESM::Creature).name())
                     return false;
             }
             if (mType == World::Detect_Key && !ptr.getClass().isKey(ptr))
