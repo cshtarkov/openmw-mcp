@@ -2918,6 +2918,9 @@ namespace MWWorld
                 if (ptr.getClass().getTypeName() != typeid(ESM::NPC).name() &&
                     ptr.getClass().getTypeName() != typeid(ESM::Creature).name())
                     return false;
+                // Don't detect dead ones
+                if (ptr.getClass().getCreatureStats(ptr).isDead())
+                    return false;
             }
             if (mType == World::Detect_Key && !ptr.getClass().isKey(ptr))
                 return false;
