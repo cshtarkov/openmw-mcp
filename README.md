@@ -41,6 +41,11 @@ Here is a list of features that this fork currently implements:
 - *Detect Animal detects all life*. This just makes it detect NPCs as
   well as creatures.
 
+Note that not all are strictly based off the original MCP. Some are
+frequent asked-about features that I've decided to implement as part
+of the engine. Maybe at some point when OpenMW is more mature they can
+me mods instead.
+
 ## FAQ
 
 ### Are there ready-made builds of OpenMW-MCP?
