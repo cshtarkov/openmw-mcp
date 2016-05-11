@@ -327,6 +327,18 @@ namespace MWMechanics
                 if (creatureStats.getAiSequence().isInCombat() && MWBase::Environment::get().getMechanicsManager()->isAggressive(actor1, actor2))
                     aggressive = true;
             }
+            // Make guards fight NPCs hostile to the player, if they attacked without provocation
+            if (actor1.getClass().isNpc())
+            {
+                NpcStats& npcStats = actor1.getClass().getNpcStats(actor1);
+                if (actor2.getClass().isClass(actor2, "Guard") &&
+                    npcStats.getCrimeId() == -1 && npcStats.getAiSequence().isInCombat() &&
+                    MWBase::Environment::get().getMechanicsManager()->isAggressive(actor1, MWMechanics::getPlayer()))
+                {
+                    aggressive = true;
+                }
+            }
+
         }
 
         // start combat if target actor is in combat with one of our followers

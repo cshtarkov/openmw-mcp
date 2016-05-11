@@ -22,6 +22,10 @@ Here is a list of features that this fork currently implements:
 - *Swiftcasting*. The ability to cast a spell immediately despite the
   player not having their hands ready for spellcasting. The button for
   swiftcasting should be set in `Settings -> Controls`, the default is `Z`.
+- *Guards protect you against hostile NPCs*. In Morrowind, guards protect you
+  against hostile creatures if you lure them near cities. This makes
+  it so it protects you against hostile NPCs as well, as long as it
+  wasn't you started the fight.
 - *Fairer pickpocketing*. The formula for calculating the chance of
   getting caught when pickpocketing an item is broken and can result
   in negative values. It is replaces with a simpler one that just
