@@ -722,7 +722,7 @@ void WeatherManager::update(float duration, bool paused)
 
     mRendering.configureFog(mResult.mFogDepth, underwaterFog, mResult.mFogColor);
     mRendering.setAmbientColour(mResult.mAmbientColor);
-    mRendering.setSunColour(mResult.mSunColor);
+    mRendering.setSunColour(mResult.mSunColor, mResult.mSunColor * mResult.mGlareView);
 
     mRendering.getSkyManager()->setWeather(mResult);
 
@@ -892,8 +892,7 @@ inline void WeatherManager::regionalWeatherChanged(const std::string& regionID, 
     MWWorld::ConstPtr player = MWMechanics::getPlayer();
     if(player.isInCell())
     {
-        std::string playerRegion = Misc::StringUtils::lowerCase(player.getCell()->getCell()->mRegion);
-        if(!playerRegion.empty() && (playerRegion == regionID))
+        if(Misc::StringUtils::ciEqual(regionID, mCurrentRegion))
         {
             addWeatherTransition(region.getWeather());
         }

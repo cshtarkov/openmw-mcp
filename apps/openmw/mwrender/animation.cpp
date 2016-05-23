@@ -10,6 +10,7 @@
 #include <osg/Material>
 
 #include <osgParticle/ParticleSystem>
+#include <osgParticle/ParticleProcessor>
 
 #include <components/nifosg/nifloader.hpp>
 
@@ -46,6 +47,44 @@
 
 namespace
 {
+
+    /// Removes all particle systems and related nodes in a subgraph.
+    class RemoveParticlesVisitor : public osg::NodeVisitor
+    {
+    public:
+        RemoveParticlesVisitor()
+            : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+        { }
+
+        virtual void apply(osg::Node &node)
+        {
+            if (dynamic_cast<osgParticle::ParticleProcessor*>(&node))
+                mToRemove.push_back(&node);
+
+            traverse(node);
+        }
+
+        virtual void apply(osg::Drawable& drw)
+        {
+            if (osgParticle::ParticleSystem* partsys = dynamic_cast<osgParticle::ParticleSystem*>(&drw))
+                mToRemove.push_back(partsys);
+        }
+
+        void remove()
+        {
+            for (std::vector<osg::ref_ptr<osg::Node> >::iterator it = mToRemove.begin(); it != mToRemove.end(); ++it)
+            {
+                // FIXME: a Drawable might have more than one parent
+                osg::Node* node = *it;
+                if (node->getNumParents())
+                    node->getParent(0)->removeChild(node);
+            }
+            mToRemove.clear();
+        }
+
+    private:
+        std::vector<osg::ref_ptr<osg::Node> > mToRemove;
+    };
 
     class GlowUpdater : public SceneUtil::StateSetUpdater
     {
@@ -259,7 +298,7 @@ namespace MWRender
 
         ControllerMap mControllerMap[Animation::sNumBlendMasks];
 
-        const std::multimap<float, std::string>& getTextKeys();
+        const std::multimap<float, std::string>& getTextKeys() const;
     };
 
     class ResetAccumRootCallback : public osg::NodeCallback
@@ -314,7 +353,7 @@ namespace MWRender
             mInsert->removeChild(mObjectRoot);
     }
 
-    MWWorld::Ptr Animation::getPtr()
+    MWWorld::ConstPtr Animation::getPtr() const
     {
         return mPtr;
     }
@@ -338,7 +377,7 @@ namespace MWRender
             mResetAccumRootCallback->setAccumulate(mAccumulate);
     }
 
-    size_t Animation::detectBlendMask(osg::Node* node)
+    size_t Animation::detectBlendMask(const osg::Node* node) const
     {
         static const char sBlendMaskRoots[sNumBlendMasks][32] = {
             "", /* Lower body / character root */
@@ -364,7 +403,7 @@ namespace MWRender
         return 0;
     }
 
-    const std::multimap<float, std::string> &Animation::AnimSource::getTextKeys()
+    const std::multimap<float, std::string> &Animation::AnimSource::getTextKeys() const
     {
         return mKeyframes->mTextKeys;
     }
@@ -441,7 +480,7 @@ namespace MWRender
         mAnimSources.clear();
     }
 
-    bool Animation::hasAnimation(const std::string &anim)
+    bool Animation::hasAnimation(const std::string &anim) const
     {
         AnimSourceList::const_iterator iter(mAnimSources.begin());
         for(;iter != mAnimSources.end();++iter)
@@ -1098,7 +1137,7 @@ namespace MWRender
     }
 
     // TODO: Should not be here
-    osg::Vec4f Animation::getEnchantmentColor(MWWorld::Ptr item)
+    osg::Vec4f Animation::getEnchantmentColor(const MWWorld::ConstPtr& item) const
     {
         osg::Vec4f result(1,1,1,1);
         std::string enchantmentName = item.getClass().getEnchantment(item);
@@ -1198,9 +1237,9 @@ namespace MWRender
         }
     }
 
-    void Animation::getLoopingEffects(std::vector<int> &out)
+    void Animation::getLoopingEffects(std::vector<int> &out) const
     {
-        for (std::vector<EffectParams>::iterator it = mEffects.begin(); it != mEffects.end(); ++it)
+        for (std::vector<EffectParams>::const_iterator it = mEffects.begin(); it != mEffects.end(); ++it)
         {
             if (it->mLoop)
                 out.push_back(it->mEffectId);
@@ -1439,6 +1478,13 @@ namespace MWRender
         }
         if (ptr.getTypeName() == typeid(ESM::Light).name() && allowLight)
             addExtraLight(getOrCreateObjectRoot(), ptr.get<ESM::Light>()->mBase);
+
+        if (!allowLight && mObjectRoot)
+        {
+            RemoveParticlesVisitor visitor;
+            mObjectRoot->accept(visitor);
+            visitor.remove();
+        }
     }
 
     Animation::AnimState::~AnimState()

@@ -387,6 +387,15 @@ namespace NifOsg
             toSetup->setFunction(boost::shared_ptr<ControllerFunction>(new ControllerFunction(ctrl)));
         }
 
+        void setupParticleController(const Nif::Controller* ctrl, SceneUtil::Controller* toSetup, int particleflags)
+        {
+            bool autoPlay = particleflags & Nif::NiNode::ParticleFlag_AutoPlay;
+            if (autoPlay)
+                toSetup->setSource(boost::shared_ptr<SceneUtil::ControllerSource>(new SceneUtil::FrameTimeSource));
+
+            toSetup->setFunction(boost::shared_ptr<ControllerFunction>(new ControllerFunction(ctrl)));
+        }
+
         void optimize (const Nif::Node* nifNode, osg::Group* node, bool skipMeshes)
         {
             // For nodes with an identity transform, remove the redundant Transform node
@@ -984,8 +993,16 @@ namespace NifOsg
                 emitterNode->addChild(emitter);
 
                 osg::ref_ptr<ParticleSystemController> callback(new ParticleSystemController(partctrl));
-                setupController(partctrl, callback, animflags);
+                setupParticleController(partctrl, callback, particleflags);
                 emitter->setUpdateCallback(callback);
+
+                if (!(particleflags & Nif::NiNode::ParticleFlag_AutoPlay))
+                {
+                    partsys->setFrozen(true);
+                    // HACK: particle system will not render in Frozen state if there was no update
+                    osg::NodeVisitor nv;
+                    partsys->update(0.0, nv);
+                }
             }
 
             // affectors must be attached *after* the emitter in the scene graph for correct update order
