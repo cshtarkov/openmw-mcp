@@ -3,6 +3,7 @@
 
 #include <components/version/version.hpp>
 #include <components/files/configurationmanager.hpp>
+#include <components/files/escape.hpp>
 #include <components/fallback/validate.hpp>
 
 #include <SDL_messagebox.h>
@@ -76,22 +77,22 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
     desc.add_options()
         ("help", "print help message")
         ("version", "print version information and quit")
-        ("data", bpo::value<Files::PathContainer>()->default_value(Files::PathContainer(), "data")
+        ("data", bpo::value<Files::EscapePathContainer>()->default_value(Files::EscapePathContainer(), "data")
             ->multitoken()->composing(), "set data directories (later directories have higher priority)")
 
-        ("data-local", bpo::value<std::string>()->default_value(""),
+            ("data-local", bpo::value<Files::EscapeHashString>()->default_value(""),
             "set local data directory (highest priority)")
 
-        ("fallback-archive", bpo::value<StringsVector>()->default_value(StringsVector(), "fallback-archive")
+        ("fallback-archive", bpo::value<Files::EscapeStringVector>()->default_value(Files::EscapeStringVector(), "fallback-archive")
             ->multitoken(), "set fallback BSA archives (later archives have higher priority)")
 
-        ("resources", bpo::value<std::string>()->default_value("resources"),
+            ("resources", bpo::value<Files::EscapeHashString>()->default_value("resources"),
             "set resources directory")
 
-        ("start", bpo::value<std::string>()->default_value(""),
+            ("start", bpo::value<Files::EscapeHashString>()->default_value(""),
             "set initial cell")
 
-        ("content", bpo::value<StringsVector>()->default_value(StringsVector(), "")
+        ("content", bpo::value<Files::EscapeStringVector>()->default_value(Files::EscapeStringVector(), "")
             ->multitoken(), "content file(s): esm/esp, or omwgame/omwaddon")
 
         ("no-sound", bpo::value<bool>()->implicit_value(true)
@@ -109,7 +110,7 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
         ("script-console", bpo::value<bool>()->implicit_value(true)
             ->default_value(false), "enable console-only script functionality")
 
-        ("script-run", bpo::value<std::string>()->default_value(""),
+            ("script-run", bpo::value<Files::EscapeHashString>()->default_value(""),
             "select a file containing a list of console commands that is executed on startup")
 
         ("script-warn", bpo::value<int>()->implicit_value (1)
@@ -119,13 +120,13 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
             "\t1 - show warning but consider script as correctly compiled anyway\n"
             "\t2 - treat warnings as errors")
 
-        ("script-blacklist", bpo::value<StringsVector>()->default_value(StringsVector(), "")
+        ("script-blacklist", bpo::value<Files::EscapeStringVector>()->default_value(Files::EscapeStringVector(), "")
             ->multitoken(), "ignore the specified script (if the use of the blacklist is enabled)")
 
         ("script-blacklist-use", bpo::value<bool>()->implicit_value(true)
             ->default_value(true), "enable script blacklisting")
 
-        ("load-savegame", bpo::value<std::string>()->default_value(""),
+            ("load-savegame", bpo::value<Files::EscapeHashString>()->default_value(""),
             "load a save game file on game startup (specify an absolute filename or a filename relative to the current working directory)")
 
         ("skip-menu", bpo::value<bool>()->implicit_value(true)
@@ -137,14 +138,14 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
         ("fs-strict", bpo::value<bool>()->implicit_value(true)
             ->default_value(false), "strict file system handling (no case folding)")
 
-        ( "encoding", bpo::value<std::string>()->
+            ("encoding", bpo::value<Files::EscapeHashString>()->
             default_value("win1252"),
             "Character encoding used in OpenMW game messages:\n"
             "\n\twin1250 - Central and Eastern European such as Polish, Czech, Slovak, Hungarian, Slovene, Bosnian, Croatian, Serbian (Latin script), Romanian and Albanian languages\n"
             "\n\twin1251 - Cyrillic alphabet such as Russian, Bulgarian, Serbian Cyrillic and other languages\n"
             "\n\twin1252 - Western European (Latin) alphabet, used by default")
 
-        ("fallback", bpo::value<FallbackMap>()->default_value(FallbackMap(), "")
+            ("fallback", bpo::value<FallbackMap>()->default_value(FallbackMap(), "")
             ->multitoken()->composing(), "fallback values")
 
         ("no-grab", "Don't grab mouse cursor")
@@ -173,29 +174,29 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
     {
         cfgMgr.readConfiguration(variables, desc, true);
 
-        Version::Version v = Version::getOpenmwVersion(variables["resources"].as<std::string>());
+        Version::Version v = Version::getOpenmwVersion(variables["resources"].as<Files::EscapeHashString>().toStdString());
         std::cout << v.describe() << std::endl;
         return false;
     }
 
     cfgMgr.readConfiguration(variables, desc);
 
-    Version::Version v = Version::getOpenmwVersion(variables["resources"].as<std::string>());
+    Version::Version v = Version::getOpenmwVersion(variables["resources"].as<Files::EscapeHashString>().toStdString());
     std::cout << v.describe() << std::endl;
 
     engine.setGrabMouse(!variables.count("no-grab"));
 
     // Font encoding settings
-    std::string encoding(variables["encoding"].as<std::string>());
+    std::string encoding(variables["encoding"].as<Files::EscapeHashString>().toStdString());
     std::cout << ToUTF8::encodingUsingMessage(encoding) << std::endl;
     engine.setEncoding(ToUTF8::calculateEncoding(encoding));
 
     // directory settings
     engine.enableFSStrict(variables["fs-strict"].as<bool>());
 
-    Files::PathContainer dataDirs(variables["data"].as<Files::PathContainer>());
+    Files::PathContainer dataDirs(Files::EscapePath::toPathContainer(variables["data"].as<Files::EscapePathContainer>()));
 
-    std::string local(variables["data-local"].as<std::string>());
+    std::string local(variables["data-local"].as<Files::EscapeHashString>().toStdString());
     if (!local.empty())
     {
         dataDirs.push_back(Files::PathContainer::value_type(local));
@@ -206,15 +207,15 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
     engine.setDataDirs(dataDirs);
 
     // fallback archives
-    StringsVector archives = variables["fallback-archive"].as<StringsVector>();
+    StringsVector archives = variables["fallback-archive"].as<Files::EscapeStringVector>().toStdStringVector();
     for (StringsVector::const_iterator it = archives.begin(); it != archives.end(); ++it)
     {
         engine.addArchive(*it);
     }
 
-    engine.setResourceDir(variables["resources"].as<std::string>());
+    engine.setResourceDir(variables["resources"].as<Files::EscapeHashString>().toStdString());
 
-    StringsVector content = variables["content"].as<StringsVector>();
+    StringsVector content = variables["content"].as<Files::EscapeStringVector>().toStdStringVector();
     if (content.empty())
     {
       std::cout << "No content file given (esm/esp, nor omwgame/omwaddon). Aborting..." << std::endl;
@@ -229,7 +230,7 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
     }
 
     // startup-settings
-    engine.setCell(variables["start"].as<std::string>());
+    engine.setCell(variables["start"].as<Files::EscapeHashString>().toStdString());
     engine.setSkipMenu (variables["skip-menu"].as<bool>(), variables["new-game"].as<bool>());
     if (!variables["skip-menu"].as<bool>() && variables["new-game"].as<bool>())
         std::cerr << "new-game used without skip-menu -> ignoring it" << std::endl;
@@ -239,11 +240,11 @@ bool parseOptions (int argc, char** argv, OMW::Engine& engine, Files::Configurat
     engine.setCompileAllDialogue(variables["script-all-dialogue"].as<bool>());
     engine.setScriptsVerbosity(variables["script-verbose"].as<bool>());
     engine.setScriptConsoleMode (variables["script-console"].as<bool>());
-    engine.setStartupScript (variables["script-run"].as<std::string>());
+    engine.setStartupScript (variables["script-run"].as<Files::EscapeHashString>().toStdString());
     engine.setWarningsMode (variables["script-warn"].as<int>());
-    engine.setScriptBlacklist (variables["script-blacklist"].as<StringsVector>());
+    engine.setScriptBlacklist (variables["script-blacklist"].as<Files::EscapeStringVector>().toStdStringVector());
     engine.setScriptBlacklistUse (variables["script-blacklist-use"].as<bool>());
-    engine.setSaveGameFile (variables["load-savegame"].as<std::string>());
+    engine.setSaveGameFile (variables["load-savegame"].as<Files::EscapeHashString>().toStdString());
 
     // other settings
     engine.setSoundUsage(!variables["no-sound"].as<bool>());

@@ -1,23 +1,19 @@
 #ifndef CSV_RENDER_INSTANCE_SELECTION_MODE_H
 #define CSV_RENDER_INSTANCE_SELECTION_MODE_H
 
-#include "../widget/scenetoolmode.hpp"
-
-class QAction;
+#include "selectionmode.hpp"
 
 namespace CSVRender
 {
-    class WorldspaceWidget;
-
-    class InstanceSelectionMode : public CSVWidget::SceneToolMode
+    class InstanceSelectionMode : public SelectionMode
     {
             Q_OBJECT
 
-            WorldspaceWidget& mWorldspaceWidget;
-            QAction *mSelectAll;
-            QAction *mDeselectAll;
-            QAction *mDeleteSelection;
-            QAction *mSelectSame;
+        public:
+
+            InstanceSelectionMode(CSVWidget::SceneToolbar* parent, WorldspaceWidget& worldspaceWidget);
+
+        protected:
 
             /// Add context menu items to \a menu.
             ///
@@ -25,20 +21,16 @@ namespace CSVRender
             ///
             /// \return Have there been any menu items to be added (if menu is 0 and there
             /// items to be added, the function must return true anyway.
-            virtual bool createContextMenu (QMenu *menu);
+            bool createContextMenu(QMenu* menu);
 
-        public:
+        private:
 
-            InstanceSelectionMode (CSVWidget::SceneToolbar *parent, WorldspaceWidget& worldspaceWidget);
+            QAction* mDeleteSelection;
+            QAction* mSelectSame;
 
         private slots:
 
-            void selectAll();
-
-            void clearSelection();
-
             void deleteSelection();
-
             void selectSame();
     };
 }

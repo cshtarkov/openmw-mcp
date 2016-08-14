@@ -255,6 +255,9 @@ void MWWorld::InventoryStore::autoEquip (const MWWorld::Ptr& actor)
                 // Equipping weapons is handled by AiCombat. Anything else (lockpicks, probes) can't be used by NPCs anyway (yet)
                 continue;
 
+            if (iter.getType() == MWWorld::ContainerStore::Type_Weapon)
+                continue;
+
             if (slots_.at (*iter2)!=end())
             {
                 Ptr old = *slots_.at (*iter2);
@@ -719,7 +722,11 @@ void MWWorld::InventoryStore::rechargeItems(float duration)
 
 void MWWorld::InventoryStore::purgeEffect(short effectId)
 {
-    mMagicEffects.remove(MWMechanics::EffectKey(effectId));
+    for (TSlots::const_iterator it = mSlots.begin(); it != mSlots.end(); ++it)
+    {
+        if (*it != end())
+            purgeEffect(effectId, (*it)->getCellRef().getRefId());
+    }
 }
 
 void MWWorld::InventoryStore::purgeEffect(short effectId, const std::string &sourceId)

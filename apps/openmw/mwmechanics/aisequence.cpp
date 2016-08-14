@@ -2,9 +2,13 @@
 
 #include <limits>
 
+#include <components/esm/aisequence.hpp>
+
+#include "../mwbase/environment.hpp"
+#include "../mwbase/world.hpp"
+
 #include "aipackage.hpp"
 #include "aistate.hpp"
-
 #include "aiwander.hpp"
 #include "aiescort.hpp"
 #include "aitravel.hpp"
@@ -13,11 +17,6 @@
 #include "aicombat.hpp"
 #include "aipursue.hpp"
 #include "actorutil.hpp"
-
-#include <components/esm/aisequence.hpp>
-
-#include "../mwbase/environment.hpp"
-#include "../mwbase/world.hpp"
 
 namespace MWMechanics
 {
@@ -29,13 +28,14 @@ void AiSequence::copy (const AiSequence& sequence)
         mPackages.push_back ((*iter)->clone());
 }
 
-AiSequence::AiSequence() : mDone (false), mLastAiPackage(-1) {}
+AiSequence::AiSequence() : mDone (false), mRepeat(false), mLastAiPackage(-1) {}
 
 AiSequence::AiSequence (const AiSequence& sequence)
 {
     copy (sequence);
     mDone = sequence.mDone;
     mLastAiPackage = sequence.mLastAiPackage;
+    mRepeat = sequence.mRepeat;
 }
 
 AiSequence& AiSequence::operator= (const AiSequence& sequence)
@@ -159,7 +159,8 @@ bool isActualAiPackage(int packageTypeId)
 {
     return (packageTypeId != AiPackage::TypeIdCombat
                    && packageTypeId != AiPackage::TypeIdPursue
-                   && packageTypeId != AiPackage::TypeIdAvoidDoor);
+                   && packageTypeId != AiPackage::TypeIdAvoidDoor
+                   && packageTypeId != AiPackage::TypeIdFace);
 }
 
 void AiSequence::execute (const MWWorld::Ptr& actor, CharacterController& characterController, AiState& state, float duration)
@@ -230,6 +231,12 @@ void AiSequence::execute (const MWWorld::Ptr& actor, CharacterController& charac
 
         if (package->execute (actor,characterController,state,duration))
         {
+            // Put repeating noncombat AI packages on the end of the stack so they can be used again
+            if (isActualAiPackage(packageTypeId) && (mRepeat || package->getRepeat()))
+            {
+                package->reset();
+                mPackages.push_back(package->clone());
+            }
             // To account for the rare case where AiPackage::execute() queued another AI package
             // (e.g. AiPursue executing a dialogue script that uses startCombat)
             std::list<MWMechanics::AiPackage*>::iterator toRemove =
@@ -287,6 +294,7 @@ void AiSequence::stack (const AiPackage& package, const MWWorld::Ptr& actor)
             else
                 ++it;
         }
+        mRepeat=false;
     }
 
     // insert new package in correct place depending on priority
@@ -312,6 +320,10 @@ AiPackage* MWMechanics::AiSequence::getActivePackage()
 
 void AiSequence::fill(const ESM::AIPackageList &list)
 {
+    // If there is more than one package in the list, enable repeating
+    if (!list.mList.empty() && list.mList.begin() != (list.mList.end()-1))
+        mRepeat = true;
+
     for (std::vector<ESM::AIPackage>::const_iterator it = list.mList.begin(); it != list.mList.end(); ++it)
     {
         MWMechanics::AiPackage* package;
@@ -361,6 +373,19 @@ void AiSequence::readState(const ESM::AiSequence::AiSequence &sequence)
     if (!sequence.mPackages.empty())
         clear();
 
+    // If there is more than one non-combat, non-pursue package in the list, enable repeating.
+    int count = 0;
+    for (std::vector<ESM::AiSequence::AiPackageContainer>::const_iterator it = sequence.mPackages.begin();
+         it != sequence.mPackages.end(); ++it)
+    {    
+        if (isActualAiPackage(it->mType))
+            count++;
+    }
+
+    if (count > 1)
+        mRepeat = true;
+
+    // Load packages
     for (std::vector<ESM::AiSequence::AiPackageContainer>::const_iterator it = sequence.mPackages.begin();
          it != sequence.mPackages.end(); ++it)
     {
@@ -408,21 +433,6 @@ void AiSequence::readState(const ESM::AiSequence::AiSequence &sequence)
 
         if (!package.get())
             continue;
-
-        // remove previous packages if required
-        if (package->shouldCancelPreviousAi())
-        {
-            for(std::list<AiPackage *>::iterator it = mPackages.begin(); it != mPackages.end();)
-            {
-                if((*it)->canCancel())
-                {
-                    delete *it;
-                    it = mPackages.erase(it);
-                }
-                else
-                    ++it;
-            }
-        }
 
         mPackages.push_back(package.release());
     }

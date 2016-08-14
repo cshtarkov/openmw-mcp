@@ -376,12 +376,7 @@ printf "Bullet 2.83.5... "
 		mv Bullet-2.83.5-win$BITS Bullet
 	fi
 
-	BULLET_SDK="`real_pwd`/Bullet"
-	add_cmake_opts -DBULLET_INCLUDE_DIR="$BULLET_SDK/include/bullet" \
-		-DBULLET_COLLISION_LIBRARY="$BULLET_SDK/lib/BulletCollision.lib" \
-		-DBULLET_COLLISION_LIBRARY_DEBUG="$BULLET_SDK/lib/BulletCollision_Debug.lib" \
-		-DBULLET_MATH_LIBRARY="$BULLET_SDK/lib/LinearMath.lib" \
-		-DBULLET_MATH_LIBRARY_DEBUG="$BULLET_SDK/lib/LinearMath_Debug.lib"
+	export BULLET_ROOT="`real_pwd`/Bullet"
 
 	echo Done.
 }
@@ -405,7 +400,7 @@ printf "FFmpeg 2.5.2... "
 		rm -rf ffmpeg-2.5.2-win$BITS-dev
 	fi
 
-	export FFMPEG_SDK="`real_pwd`/FFmpeg"
+	export FFMPEG_HOME="`real_pwd`/FFmpeg"
 	add_runtime_dlls `pwd`/FFmpeg/bin/{avcodec-56,avformat-56,avutil-54,swresample-1,swscale-3}.dll
 
 	if [ $BITS -eq 32 ]; then
@@ -658,6 +653,19 @@ if [ -z $CI ]; then
 		cp "$DLL" $CONFIGURATION/osgPlugins-3.3.8
 	done
 	echo
+	
+	echo "Copying Runtime Resources/Config Files"
+	
+	echo "  gamecontrollerdb.txt"
+	cp $CONFIGURATION/../gamecontrollerdb.txt $CONFIGURATION/gamecontrollerdb.txt
+	echo "  openmw.cfg"
+	cp $CONFIGURATION/../openmw.cfg.install $CONFIGURATION/openmw.cfg
+	echo "  openmw-cs.cfg"
+	cp $CONFIGURATION/../openmw-cs.cfg $CONFIGURATION/openmw-cs.cfg
+	echo "  settings-default.cfg"
+	cp $CONFIGURATION/../settings-default.cfg $CONFIGURATION/settings-default.cfg
+	echo "  resources/"
+	cp -r $CONFIGURATION/../resources $CONFIGURATION/resources
 fi
 
 exit $RET

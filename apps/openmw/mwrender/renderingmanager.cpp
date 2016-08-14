@@ -367,12 +367,6 @@ namespace MWRender
         mSky->setSunDirection(position);
     }
 
-    osg::Vec3f RenderingManager::getEyePos()
-    {
-        osg::Vec3d eye = mViewer->getCameraManipulator()->getMatrix().getTrans();
-        return eye;
-    }
-
     void RenderingManager::addCell(const MWWorld::CellStore *store)
     {
         mPathgrid->addCell(store);
@@ -382,7 +376,6 @@ namespace MWRender
         if (store->getCell()->isExterior())
             mTerrain->loadCell(store->getCell()->getGridX(), store->getCell()->getGridY());
     }
-
     void RenderingManager::removeCell(const MWWorld::CellStore *store)
     {
         mPathgrid->removeCell(store);
@@ -668,6 +661,7 @@ namespace MWRender
     {
         RenderingManager::RayResult result;
         result.mHit = false;
+        result.mRatio = 0;
         if (intersector->containsIntersections())
         {
             result.mHit = true;
@@ -675,6 +669,7 @@ namespace MWRender
 
             result.mHitPointWorld = intersection.getWorldIntersectPoint();
             result.mHitNormalWorld = intersection.getWorldIntersectNormal();
+            result.mRatio = intersection.ratio;
 
             PtrHolder* ptrHolder = NULL;
             for (osg::NodePath::const_iterator it = intersection.nodePath.begin(); it != intersection.nodePath.end(); ++it)

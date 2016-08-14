@@ -3,10 +3,15 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <ctype.h>
+
+#include <components/files/escape.hpp>
 
 #include <boost/bind.hpp>
 #include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 
 /**
  * \namespace Files
@@ -139,8 +144,11 @@ bool ConfigurationManager::loadConfig(const boost::filesystem::path& path,
         if (!mSilent)
             std::cout << "Loading config file: " << cfgFile.string() << "... ";
 
-        boost::filesystem::ifstream configFileStream(cfgFile);
-        if (configFileStream.is_open())
+        boost::filesystem::ifstream configFileStreamUnfiltered(cfgFile);
+        boost::iostreams::filtering_istream configFileStream;
+        configFileStream.push(escape_hash_filter());
+        configFileStream.push(configFileStreamUnfiltered);
+        if (configFileStreamUnfiltered.is_open())
         {
             boost::program_options::store(boost::program_options::parse_config_file(
                 configFileStream, description, true), variables);

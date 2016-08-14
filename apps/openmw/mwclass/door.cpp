@@ -26,6 +26,7 @@
 
 #include "../mwrender/objects.hpp"
 #include "../mwrender/renderinginterface.hpp"
+#include "../mwrender/animation.hpp"
 
 #include "../mwmechanics/actorutil.hpp"
 
@@ -108,9 +109,24 @@ namespace MWClass
 
         MWWorld::ContainerStore &invStore = actor.getClass().getContainerStore(actor);
 
-        bool needKey = ptr.getCellRef().getLockLevel() > 0;
+        bool isLocked = ptr.getCellRef().getLockLevel() > 0;
+        bool isTrapped = !ptr.getCellRef().getTrap().empty();
         bool hasKey = false;
         std::string keyName;
+
+        // make door glow if player activates it with telekinesis
+        if (actor == MWBase::Environment::get().getWorld()->getPlayerPtr() &&
+            MWBase::Environment::get().getWorld()->getDistanceToFacedObject() > 
+            MWBase::Environment::get().getWorld()->getMaxActivationDistance())
+        {
+            MWRender::Animation* animation = MWBase::Environment::get().getWorld()->getAnimation(ptr);
+
+            const MWWorld::ESMStore& store = MWBase::Environment::get().getWorld()->getStore();            
+            int index = ESM::MagicEffect::effectStringToId("sEffectTelekinesis");
+            const ESM::MagicEffect *effect = store.get<ESM::MagicEffect>().find(index);
+
+            animation->addSpellCastGlow(effect); // TODO: Telekinesis glow should only be as long as the door animation
+        }
 
         // make key id lowercase
         std::string keyId = ptr.getCellRef().getKey();
@@ -126,32 +142,47 @@ namespace MWClass
             }
         }
 
-        if (needKey && hasKey)
+        if ((isLocked || isTrapped) && hasKey)
         {
             if(actor == MWMechanics::getPlayer())
                 MWBase::Environment::get().getWindowManager()->messageBox(keyName + " #{sKeyUsed}");
-            unlock(ptr); //Call the function here. because that makes sense.
+            if(isLocked)
+                unlock(ptr); //Call the function here. because that makes sense.
             // using a key disarms the trap
-            ptr.getCellRef().setTrap("");
+            if(isTrapped)
+            {
+                ptr.getCellRef().setTrap("");
+                MWBase::Environment::get().getSoundManager()->playSound3D(ptr,
+                    "Disarm Trap", 1.0f, 1.0f, MWBase::SoundManager::Play_TypeSfx,
+                    MWBase::SoundManager::Play_Normal);
+                isTrapped = false;
+            }
         }
 
-        if (!needKey || hasKey)
+        if (!isLocked || hasKey)
         {
-            if(!ptr.getCellRef().getTrap().empty())
+            if(isTrapped)
             {
                 // Trap activation
-                boost::shared_ptr<MWWorld::Action> action(new MWWorld::ActionTrap(actor, ptr.getCellRef().getTrap(), ptr));
+                boost::shared_ptr<MWWorld::Action> action(new MWWorld::ActionTrap(ptr.getCellRef().getTrap(), ptr));
                 action->setSound(trapActivationSound);
                 return action;
             }
 
             if (ptr.getCellRef().getTeleport())
             {
-                boost::shared_ptr<MWWorld::Action> action(new MWWorld::ActionTeleport (ptr.getCellRef().getDestCell(), ptr.getCellRef().getDoorDest(), true));
-
-                action->setSound(openSound);
-
-                return action;
+                if (actor == MWMechanics::getPlayer() && MWBase::Environment::get().getWorld()->getDistanceToFacedObject() > MWBase::Environment::get().getWorld()->getMaxActivationDistance())
+                {
+                    // player activated teleport door with telekinesis
+                    boost::shared_ptr<MWWorld::Action> action(new MWWorld::FailedAction);
+                    return action;
+                }
+                else
+                {
+                    boost::shared_ptr<MWWorld::Action> action(new MWWorld::ActionTeleport (ptr.getCellRef().getDestCell(), ptr.getCellRef().getDoorDest(), true));
+                    action->setSound(openSound);
+                    return action;
+                }              
             }
             else
             {
@@ -190,7 +221,7 @@ namespace MWClass
         else
         {
             // locked, and we can't open.
-            boost::shared_ptr<MWWorld::Action> action(new MWWorld::FailedAction);
+            boost::shared_ptr<MWWorld::Action> action(new MWWorld::FailedAction(std::string(), ptr));
             action->setSound(lockedSound);
             return action;
         }
@@ -212,6 +243,14 @@ namespace MWClass
     bool Door::canLock(const MWWorld::ConstPtr &ptr) const
     {
         return true;
+    }
+
+    bool Door::allowTelekinesis(const MWWorld::ConstPtr &ptr) const
+    {
+        if (ptr.getCellRef().getTeleport() && ptr.getCellRef().getLockLevel() <= 0 && ptr.getCellRef().getTrap().empty())
+            return false;
+        else
+            return true;
     }
 
     std::string Door::getScript (const MWWorld::ConstPtr& ptr) const

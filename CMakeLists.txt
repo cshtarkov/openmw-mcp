@@ -76,6 +76,14 @@ option(BUILD_WITH_CODE_COVERAGE "Enable code coverage with gconv" OFF)
 option(BUILD_UNITTESTS "Enable Unittests with Google C++ Unittest" OFF)
 option(BUILD_NIFTEST "build nif file tester" OFF)
 option(BUILD_MYGUI_PLUGIN "build MyGUI plugin for OpenMW resources, to use with MyGUI tools" ON)
+option(BUILD_DOCS        "build documentation." OFF )
+
+# what is necessary to build documentation
+IF( BUILD_DOCS )
+    # Builds the documentation.
+    FIND_PACKAGE( Sphinx REQUIRED )
+    FIND_PACKAGE( Doxygen REQUIRED )
+ENDIF()
 
 # OS X deployment
 option(OPENMW_OSX_DEPLOYMENT OFF)
@@ -140,7 +148,10 @@ if (USE_QT)
     endif()
 endif()
 
-if (USE_QT AND DESIRED_QT_VERSION MATCHES 5)
+if (APPLE)
+    # OS X build process relies on this fix: https://github.com/Kitware/CMake/commit/3df5147043d83aa09acd5c9ce31d5c602efb99db
+    cmake_minimum_required(VERSION 3.1.0)
+elseif (USE_QT AND DESIRED_QT_VERSION MATCHES 5)
     # 2.8.11+ is required to make Qt5 happy and allow linking QtMain on Windows.
     cmake_minimum_required(VERSION 2.8.11)
 else()
@@ -155,17 +166,10 @@ add_definitions(-D__STDC_CONSTANT_MACROS)
 
 # TinyXML
 option(USE_SYSTEM_TINYXML "Use system TinyXML library instead of internal." OFF)
-if(USE_SYSTEM_TINYXML)
-    find_library(TINYXML_LIBRARIES tinyxml)
-    find_path(TINYXML_INCLUDE_DIR tinyxml.h)
-    message(STATUS "Found TinyXML: ${TINYXML_LIBRARIES} ${TINYXML_INCLUDE_DIR}")
+if (USE_SYSTEM_TINYXML)
+    find_package(TinyXML REQUIRED)
     add_definitions (-DTIXML_USE_STL)
-    if(TINYXML_LIBRARIES AND TINYXML_INCLUDE_DIR)
-        include_directories(${TINYXML_INCLUDE_DIR})
-        message(STATUS "Using system TinyXML library.")
-    else()
-        message(FATAL_ERROR "Detection of system TinyXML incomplete.")
-    endif()
+    include_directories(SYSTEM ${TinyXML_INCLUDE_DIRS})
 endif()
 
 # Platform specific
@@ -180,6 +184,11 @@ if (WIN32)
 
     # Get rid of useless crud from windows.h
     add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+endif()
+
+if (NOT WIN32 AND BUILD_WIZARD) # windows users can just run the morrowind installer
+    find_package(LIBUNSHIELD REQUIRED) # required only for non win32 when building openmw-wizard
+    set(OPENMW_USE_UNSHIELD TRUE)
 endif()
 
 option(OPENGL_ES "enable opengl es support" FALSE )
@@ -221,6 +230,7 @@ if(OSG_STATIC)
 
       # For now, users wishing to do a static build will need to pass the path to where the plugins reside
       # More clever logic would need to deduce the path, probably installed under <OpenSceneGraph>/lib/osgPlugins-<X.X.X>
+      include(FindPkgMacros)
       find_library(${PLUGIN_NAME}_LIBRARY_REL NAMES ${PLUGIN_NAME} HINTS ${OSG_PLUGIN_LIB_SEARCH_PATH})
       find_library(${PLUGIN_NAME}_LIBRARY_DBG NAMES ${PLUGIN_NAME_DBG} HINTS ${OSG_PLUGIN_LIB_SEARCH_PATH})
       make_library_set(${PLUGIN_NAME}_LIBRARY)
@@ -280,10 +290,7 @@ endif()
 find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 find_package(SDL2 REQUIRED)
 find_package(OpenAL REQUIRED)
-find_package(Bullet REQUIRED)
-if (NOT BULLET_FOUND OR BULLET_VERSION VERSION_LESS 283)
-    message(FATAL_ERROR "OpenMW requires Bullet version 2.83 or later")
-endif()
+find_package(Bullet 283 REQUIRED COMPONENTS BulletCollision LinearMath)
 
 include_directories("."
     SYSTEM
@@ -291,7 +298,7 @@ include_directories("."
     ${Boost_INCLUDE_DIR}
     ${MYGUI_INCLUDE_DIRS}
     ${OPENAL_INCLUDE_DIR}
-    ${BULLET_INCLUDE_DIRS}
+    ${Bullet_INCLUDE_DIRS}
 )
 
 link_directories(${SDL2_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${MYGUI_LIB_DIR})
@@ -673,8 +680,6 @@ if (WIN32)
     endforeach(d)
 
     set_target_properties(components PROPERTIES COMPILE_FLAGS "${WARNINGS} ${MT_BUILD}")
-    # oics uses tinyxml, which has an initialized but unused variable
-    set_target_properties(oics PROPERTIES COMPILE_FLAGS "${WARNINGS} /wd4189 ${MT_BUILD}")
     set_target_properties(osg-ffmpeg-videoplayer PROPERTIES COMPILE_FLAGS "${WARNINGS} ${MT_BUILD}")
 
     if (BUILD_BSATOOL)

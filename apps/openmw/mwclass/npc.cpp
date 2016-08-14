@@ -351,6 +351,8 @@ namespace MWClass
 
                 data->mNpcStats.setNeedRecalcDynamicStats(true);
             }
+            if (data->mNpcStats.isDead())
+                data->mNpcStats.setDeathAnimationFinished(true);
 
             // race powers
             const ESM::Race *race = MWBase::Environment::get().getWorld()->getStore().get<ESM::Race>().find(ref->mBase->mRace);
@@ -1159,6 +1161,7 @@ namespace MWClass
 
                 switch(boots->getClass().getEquipmentSkill(*boots))
                 {
+                    case ESM::Skill::Unarmored:
                     case ESM::Skill::LightArmor:
                         return (name == "left") ? "FootLightLeft" : "FootLightRight";
                     case ESM::Skill::MediumArmor:

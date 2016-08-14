@@ -258,6 +258,9 @@ namespace MWWorld
                 if (mState != State_Loaded)
                     return false;
 
+                if (mMergedRefs.empty())
+                    return true;
+
                 mHasState = true;
 
                 for (unsigned int i=0; i<mMergedRefs.size(); ++i)
@@ -304,6 +307,9 @@ namespace MWWorld
             {
                 if (mState != State_Loaded)
                     return false;
+
+                if (mMergedRefs.empty())
+                    return true;
 
                 mHasState = true;
 
@@ -379,7 +385,7 @@ namespace MWWorld
 
             void loadRefs();
 
-            void loadRef (ESM::CellRef& ref, bool deleted);
+            void loadRef (ESM::CellRef& ref, bool deleted, std::map<ESM::RefNum, std::string>& refNumToID);
             ///< Make case-adjustments to \a ref and insert it into the respective container.
             ///
             /// Invalid \a ref objects are silently dropped.

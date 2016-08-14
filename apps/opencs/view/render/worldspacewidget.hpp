@@ -4,6 +4,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <QTimer>
+#include <osg/Vec3>
 
 #include "../../model/doc/document.hpp"
 #include "../../model/world/tablemimedata.hpp"
@@ -32,8 +33,17 @@ namespace CSVWidget
 namespace CSVRender
 {
     class TagBase;
+    class Cell;
     class CellArrow;
     class EditMode;
+
+    struct WorldspaceHitResult
+    {
+        bool hit;
+        osg::ref_ptr<TagBase> tag;
+        unsigned int index0, index1, index2; // indices of mesh vertices
+        osg::Vec3d worldPos;
+    };
 
     class WorldspaceWidget : public SceneWidget
     {
@@ -45,10 +55,11 @@ namespace CSVRender
             unsigned int mInteractionMask;
             CSVWidget::SceneToolMode *mEditMode;
             bool mLocked;
-            std::string mDragMode;
+            int mDragMode;
             bool mDragging;
             int mDragX;
             int mDragY;
+            bool mSpeedMode;
             double mDragFactor;
             double mDragWheelFactor;
             double mDragShiftFactor;
@@ -73,6 +84,15 @@ namespace CSVRender
                 needPaged,
                 needUnpaged,
                 ignored //either mixed cells, or not cells
+            };
+
+            enum InteractionType
+            {
+                InteractionType_PrimaryEdit,
+                InteractionType_PrimarySelect,
+                InteractionType_SecondaryEdit,
+                InteractionType_SecondarySelect,
+                InteractionType_None
             };
 
             WorldspaceWidget (CSMDoc::Document& document, QWidget *parent = 0);
@@ -128,6 +148,9 @@ namespace CSVRender
             virtual void clearSelection (int elementMask) = 0;
 
             /// \param elementMask Elements to be affected by the select operation
+            virtual void invertSelection (int elementMask) = 0;
+
+            /// \param elementMask Elements to be affected by the select operation
             virtual void selectAll (int elementMask) = 0;
 
             // Select everything that references the same ID as at least one of the elements
@@ -136,18 +159,16 @@ namespace CSVRender
             /// \param elementMask Elements to be affected by the select operation
             virtual void selectAllWithSameParentId (int elementMask) = 0;
 
-            /// Return the next intersection point with scene elements matched by
+            /// Return the next intersection with scene elements matched by
             /// \a interactionMask based on \a localPos and the camera vector.
-            /// If there is no such point, instead a point "in front" of \a localPos will be
+            /// If there is no such intersection, instead a point "in front" of \a localPos will be
             /// returned.
-            ///
-            /// \param ignoreHidden ignore elements specified in interactionMask that are
-            /// flagged as not visible.
-            osg::Vec3f getIntersectionPoint (const QPoint& localPos,
-                unsigned int interactionMask = Mask_Reference | Mask_Terrain,
-                bool ignoreHidden = false) const;
+            WorldspaceHitResult mousePick (const QPoint& localPos, unsigned int interactionMask) const;
 
             virtual std::string getCellId (const osg::Vec3f& point) const = 0;
+
+            /// \note Returns the cell if it exists, otherwise a null pointer
+            virtual Cell* getCell(const osg::Vec3d& point) const = 0;
 
             virtual std::vector<osg::ref_ptr<TagBase> > getSelection (unsigned int elementMask)
                 const = 0;
@@ -159,12 +180,6 @@ namespace CSVRender
 
             /// Erase all overrides and restore the visual representation to its true state.
             virtual void reset (unsigned int elementMask) = 0;
-
-            /// \note Drags will be automatically aborted when the aborting is triggered
-            /// (either explicitly or implicitly) from within this class. This function only
-            /// needs to be called, when the drag abort is triggered externally (e.g. from
-            /// an edit mode).
-            void abortDrag();
 
         protected:
 
@@ -186,20 +201,15 @@ namespace CSVRender
             virtual void updateOverlay();
 
             virtual void mouseMoveEvent (QMouseEvent *event);
-            virtual void mousePressEvent (QMouseEvent *event);
-            virtual void mouseReleaseEvent (QMouseEvent *event);
             virtual void wheelEvent (QWheelEvent *event);
-            virtual void keyPressEvent (QKeyEvent *event);
 
-            virtual void handleMouseClick (osg::ref_ptr<TagBase> tag, const std::string& button,
-                bool shift);
-
-             /// \return Is \a key a button mapping setting? (ignored otherwise)
-            virtual bool storeMappingSetting (const CSMPrefs::Setting *setting);
+            virtual void handleInteractionPress (const WorldspaceHitResult& hit, InteractionType type);
 
             virtual void settingChanged (const CSMPrefs::Setting *setting);
 
             EditMode *getEditMode();
+
+            bool getSpeedMode();
 
         private:
 
@@ -209,9 +219,17 @@ namespace CSVRender
 
             void dragMoveEvent(QDragMoveEvent *event);
 
-            osg::ref_ptr<TagBase> mousePick (const QPoint& localPos);
-
             virtual std::string getStartupInstruction() = 0;
+
+            void handleInteraction(InteractionType type, bool activate);
+
+        public slots:
+
+            /// \note Drags will be automatically aborted when the aborting is triggered
+            /// (either explicitly or implicitly) from within this class. This function only
+            /// needs to be called, when the drag abort is triggered externally (e.g. from
+            /// an edit mode).
+            void abortDrag();
 
         private slots:
 
@@ -230,8 +248,6 @@ namespace CSVRender
 
             virtual void pathgridDataChanged (const QModelIndex& topLeft, const QModelIndex& bottomRight) = 0;
 
-            virtual void pathgridRemoved (const QModelIndex& parent, int start, int end) = 0;
-
             virtual void pathgridAboutToBeRemoved (const QModelIndex& parent, int start, int end) = 0;
 
             virtual void pathgridAdded (const QModelIndex& parent, int start, int end) = 0;
@@ -247,6 +263,16 @@ namespace CSVRender
             void editModeChanged (const std::string& id);
 
             void showToolTip();
+
+            void primaryEdit(bool activate);
+
+            void secondaryEdit(bool activate);
+
+            void primarySelect(bool activate);
+
+            void secondarySelect(bool activate);
+
+            void speedMode(bool activate);
 
         protected slots:
 

@@ -62,7 +62,6 @@ struct ConfigurationManager
 
         bool mSilent;
 };
-
 } /* namespace Cfg */
 
 #endif /* COMPONENTS_FILES_CONFIGURATIONMANAGER_HPP */

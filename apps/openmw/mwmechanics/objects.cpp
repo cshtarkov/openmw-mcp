@@ -2,10 +2,10 @@
 
 #include <iostream>
 
-#include "movement.hpp"
-
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
+
+#include "movement.hpp"
 
 namespace MWMechanics
 {
@@ -79,12 +79,12 @@ void Objects::update(float duration, bool paused)
     }
 }
 
-bool Objects::playAnimationGroup(const MWWorld::Ptr& ptr, const std::string& groupName, int mode, int number)
+bool Objects::playAnimationGroup(const MWWorld::Ptr& ptr, const std::string& groupName, int mode, int number, bool persist)
 {
     PtrControllerMap::iterator iter = mObjects.find(ptr);
     if(iter != mObjects.end())
     {
-        return iter->second->playGroup(groupName, mode, number);
+        return iter->second->playGroup(groupName, mode, number, persist);
     }
     else
     {
@@ -97,6 +97,12 @@ void Objects::skipAnimation(const MWWorld::Ptr& ptr)
     PtrControllerMap::iterator iter = mObjects.find(ptr);
     if(iter != mObjects.end())
         iter->second->skipAnim();
+}
+
+void Objects::persistAnimationStates()
+{
+    for (PtrControllerMap::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+        iter->second->persistAnimationState();
 }
 
 void Objects::getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<MWWorld::Ptr>& out)

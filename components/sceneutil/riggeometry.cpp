@@ -241,7 +241,7 @@ void RigGeometry::update(osg::NodeVisitor* nv)
         return;
     mLastFrameNumber = nv->getTraversalNumber();
 
-    mSkeleton->updateBoneMatrices(nv);
+    mSkeleton->updateBoneMatrices(nv->getTraversalNumber());
 
     // skinning
     osg::Vec3Array* positionSrc = static_cast<osg::Vec3Array*>(mSourceGeometry->getVertexArray());
@@ -301,9 +301,9 @@ void RigGeometry::updateBounds(osg::NodeVisitor *nv)
         return;
     mBoundsFirstFrame = false;
 
-    mSkeleton->updateBoneMatrices(nv);
+    mSkeleton->updateBoneMatrices(nv->getTraversalNumber());
 
-    updateGeomToSkelMatrix(nv);
+    updateGeomToSkelMatrix(nv->getNodePath());
 
     osg::BoundingBox box;
     for (BoneSphereMap::const_iterator it = mBoneSphereMap.begin(); it != mBoneSphereMap.end(); ++it)
@@ -315,19 +315,17 @@ void RigGeometry::updateBounds(osg::NodeVisitor *nv)
     }
 
     _boundingBox = box;
-    _boundingBoxComputed = true;
-    // in OSG 3.3.3 and up Drawable inherits from Node, so has a bounding sphere as well.
     _boundingSphere = osg::BoundingSphere(_boundingBox);
     _boundingSphereComputed = true;
     for (unsigned int i=0; i<getNumParents(); ++i)
         getParent(i)->dirtyBound();
 }
 
-void RigGeometry::updateGeomToSkelMatrix(osg::NodeVisitor *nv)
+void RigGeometry::updateGeomToSkelMatrix(const osg::NodePath& nodePath)
 {
     mSkelToGeomPath.clear();
     bool foundSkel = false;
-    for (osg::NodePath::const_iterator it = nv->getNodePath().begin(); it != nv->getNodePath().end(); ++it)
+    for (osg::NodePath::const_iterator it = nodePath.begin(); it != nodePath.end(); ++it)
     {
         if (!foundSkel)
         {

@@ -8,6 +8,8 @@
 
 #include <components/esm/loadland.hpp>
 
+#include "../../model/prefs/shortcut.hpp"
+
 #include "../../model/world/tablemimedata.hpp"
 #include "../../model/world/idtable.hpp"
 
@@ -17,6 +19,7 @@
 
 #include "editmode.hpp"
 #include "mask.hpp"
+#include "cameracontroller.hpp"
 
 bool CSVRender::PagedWorldspaceWidget::adjustCells()
 {
@@ -142,74 +145,71 @@ void CSVRender::PagedWorldspaceWidget::addEditModeSelectorButtons (
         "terrain-move");
 }
 
-void CSVRender::PagedWorldspaceWidget::handleMouseClick (osg::ref_ptr<TagBase> tag, const std::string& button, bool shift)
+void CSVRender::PagedWorldspaceWidget::handleInteractionPress (const WorldspaceHitResult& hit, InteractionType type)
 {
-    if (tag && tag->getMask()==Mask_CellArrow)
+    if (hit.tag && hit.tag->getMask()==Mask_CellArrow)
     {
-        if (button=="p-edit" || button=="s-edit")
+        if (CellArrowTag *cellArrowTag = dynamic_cast<CSVRender::CellArrowTag *> (hit.tag.get()))
         {
-            if (CellArrowTag *cellArrowTag =
-                dynamic_cast<CSVRender::CellArrowTag *> (tag.get()))
+            CellArrow *arrow = cellArrowTag->getCellArrow();
+
+            CSMWorld::CellCoordinates coordinates = arrow->getCoordinates();
+
+            CellArrow::Direction direction = arrow->getDirection();
+
+            int x = 0;
+            int y = 0;
+
+            switch (direction)
             {
-                CellArrow *arrow = cellArrowTag->getCellArrow();
+                case CellArrow::Direction_North: y = 1; break;
+                case CellArrow::Direction_West: x = -1; break;
+                case CellArrow::Direction_South: y = -1; break;
+                case CellArrow::Direction_East: x = 1; break;
+            }
 
-                CSMWorld::CellCoordinates coordinates = arrow->getCoordinates();
+            bool modified = false;
 
-                CellArrow::Direction direction = arrow->getDirection();
+            if (type == InteractionType_PrimarySelect)
+            {
+                addCellSelection (x, y);
+                modified = true;
+            }
+            else if (type == InteractionType_SecondarySelect)
+            {
+                moveCellSelection (x, y);
+                modified = true;
+            }
+            else // Primary/SecondaryEdit
+            {
+                CSMWorld::CellCoordinates newCoordinates = coordinates.move (x, y);
 
-                int x = 0;
-                int y = 0;
-
-                switch (direction)
+                if (mCells.find (newCoordinates)==mCells.end())
                 {
-                    case CellArrow::Direction_North: y = 1; break;
-                    case CellArrow::Direction_West: x = -1; break;
-                    case CellArrow::Direction_South: y = -1; break;
-                    case CellArrow::Direction_East: x = 1; break;
-                }
-
-                bool modified = false;
-
-                if (shift)
-                {
-                    if (button=="p-edit")
-                        addCellSelection (x, y);
-                    else
-                        moveCellSelection (x, y);
-
+                    addCellToScene (newCoordinates);
+                    mSelection.add (newCoordinates);
                     modified = true;
                 }
-                else
-                {
-                    CSMWorld::CellCoordinates newCoordinates = coordinates.move (x, y);
 
-                    if (mCells.find (newCoordinates)==mCells.end())
+                if (type == InteractionType_SecondaryEdit)
+                {
+                    if (mCells.find (coordinates)!=mCells.end())
                     {
-                        addCellToScene (newCoordinates);
-                        mSelection.add (newCoordinates);
+                        removeCellFromScene (coordinates);
+                        mSelection.remove (coordinates);
                         modified = true;
                     }
-
-                    if (button=="s-edit")
-                    {
-                        if (mCells.find (coordinates)!=mCells.end())
-                        {
-                            removeCellFromScene (coordinates);
-                            mSelection.remove (coordinates);
-                            modified = true;
-                        }
-                    }
                 }
-
-                if (modified)
-                    adjustCells();
-
-                return;
             }
+
+            if (modified)
+                adjustCells();
+
+            return;
         }
     }
 
-    WorldspaceWidget::handleMouseClick (tag, button, shift);
+    WorldspaceWidget::handleInteractionPress (hit, type);
 }
 
 void CSVRender::PagedWorldspaceWidget::referenceableDataChanged (const QModelIndex& topLeft,
@@ -279,38 +279,29 @@ void CSVRender::PagedWorldspaceWidget::pathgridDataChanged (const QModelIndex& t
 {
     const CSMWorld::SubCellCollection<CSMWorld::Pathgrid>& pathgrids = mDocument.getData().getPathgrids();
 
+    int rowStart = -1;
+    int rowEnd = -1;
+
     if (topLeft.parent().isValid())
     {
-        int row = topLeft.parent().row();
-
-        const CSMWorld::Pathgrid& pathgrid = pathgrids.getRecord(row).get();
-        CSMWorld::CellCoordinates coords = CSMWorld::CellCoordinates(pathgrid.mData.mX, pathgrid.mData.mY);
-
-        std::map<CSMWorld::CellCoordinates, Cell*>::iterator searchResult = mCells.find(coords);
-        if (searchResult != mCells.end())
-        {
-            searchResult->second->pathgridDataChanged(topLeft, bottomRight);
-            flagAsModified();
-        }
+        rowStart = topLeft.parent().row();
+        rowEnd = bottomRight.parent().row();
     }
-}
-
-void CSVRender::PagedWorldspaceWidget::pathgridRemoved (const QModelIndex& parent, int start, int end)
-{
-    const CSMWorld::SubCellCollection<CSMWorld::Pathgrid>& pathgrids = mDocument.getData().getPathgrids();
-
-    if (parent.isValid())
+    else
     {
-        // Pathgrid data was modified
-        int row = parent.row();
+        rowStart = topLeft.row();
+        rowEnd = bottomRight.row();
+    }
 
+    for (int row = rowStart; row <= rowEnd; ++row)
+    {
         const CSMWorld::Pathgrid& pathgrid = pathgrids.getRecord(row).get();
         CSMWorld::CellCoordinates coords = CSMWorld::CellCoordinates(pathgrid.mData.mX, pathgrid.mData.mY);
 
         std::map<CSMWorld::CellCoordinates, Cell*>::iterator searchResult = mCells.find(coords);
         if (searchResult != mCells.end())
         {
-            searchResult->second->pathgridRowRemoved(parent, start, end);
+            searchResult->second->pathgridModified();
             flagAsModified();
         }
     }
@@ -340,11 +331,10 @@ void CSVRender::PagedWorldspaceWidget::pathgridAboutToBeRemoved (const QModelInd
 
 void CSVRender::PagedWorldspaceWidget::pathgridAdded(const QModelIndex& parent, int start, int end)
 {
-    const CSMWorld::SubCellCollection<CSMWorld::Pathgrid>& pathgrids = mDocument.getData().getPathgrids();
+   const CSMWorld::SubCellCollection<CSMWorld::Pathgrid>& pathgrids = mDocument.getData().getPathgrids();
 
     if (!parent.isValid())
     {
-        // Pathgrid added theoretically, unable to test until it is possible to add pathgrids
         for (int row = start; row <= end; ++row)
         {
             const CSMWorld::Pathgrid& pathgrid = pathgrids.getRecord(row).get();
@@ -353,24 +343,9 @@ void CSVRender::PagedWorldspaceWidget::pathgridAdded(const QModelIndex& parent, 
             std::map<CSMWorld::CellCoordinates, Cell*>::iterator searchResult = mCells.find(coords);
             if (searchResult != mCells.end())
             {
-                searchResult->second->pathgridAdded(pathgrid);
+                searchResult->second->pathgridModified();
                 flagAsModified();
             }
-        }
-    }
-    else
-    {
-        // Pathgrid data was modified
-        int row = parent.row();
-
-        const CSMWorld::Pathgrid& pathgrid = pathgrids.getRecord(row).get();
-        CSMWorld::CellCoordinates coords = CSMWorld::CellCoordinates(pathgrid.mData.mX, pathgrid.mData.mY);
-
-        std::map<CSMWorld::CellCoordinates, Cell*>::iterator searchResult = mCells.find(coords);
-        if (searchResult != mCells.end())
-        {
-            searchResult->second->pathgridRowAdded(parent, start, end);
-            flagAsModified();
         }
     }
 }
@@ -461,6 +436,27 @@ void CSVRender::PagedWorldspaceWidget::moveCellSelection (int x, int y)
     mSelection = newSelection;
 }
 
+void CSVRender::PagedWorldspaceWidget::addCellToSceneFromCamera (int offsetX, int offsetY)
+{
+    const int CellSize = 8192;
+
+    osg::Vec3f eye, center, up;
+    getCamera()->getViewMatrixAsLookAt(eye, center, up);
+
+    int cellX = (int)std::floor(center.x() / CellSize) + offsetX;
+    int cellY = (int)std::floor(center.y() / CellSize) + offsetY;
+
+    CSMWorld::CellCoordinates cellCoordinates(cellX, cellY);
+
+    if (!mSelection.has(cellCoordinates))
+    {
+        addCellToScene(cellCoordinates);
+        mSelection.add(cellCoordinates);
+
+        adjustCells();
+    }
+}
+
 CSVRender::PagedWorldspaceWidget::PagedWorldspaceWidget (QWidget* parent, CSMDoc::Document& document)
 : WorldspaceWidget (document, parent), mDocument (document), mWorldspace ("std::default"),
   mControlElements(NULL), mDisplayCellCoord(true)
@@ -474,6 +470,22 @@ CSVRender::PagedWorldspaceWidget::PagedWorldspaceWidget (QWidget* parent, CSMDoc
         this, SLOT (cellRemoved (const QModelIndex&, int, int)));
     connect (cells, SIGNAL (rowsInserted (const QModelIndex&, int, int)),
         this, SLOT (cellAdded (const QModelIndex&, int, int)));
+
+    // Shortcuts
+    CSMPrefs::Shortcut* loadCameraCellShortcut = new CSMPrefs::Shortcut("scene-load-cam-cell", this);
+    connect(loadCameraCellShortcut, SIGNAL(activated()), this, SLOT(loadCameraCell()));
+
+    CSMPrefs::Shortcut* loadCameraEastCellShortcut = new CSMPrefs::Shortcut("scene-load-cam-eastcell", this);
+    connect(loadCameraEastCellShortcut, SIGNAL(activated()), this, SLOT(loadEastCell()));
+
+    CSMPrefs::Shortcut* loadCameraNorthCellShortcut = new CSMPrefs::Shortcut("scene-load-cam-northcell", this);
+    connect(loadCameraNorthCellShortcut, SIGNAL(activated()), this, SLOT(loadNorthCell()));
+
+    CSMPrefs::Shortcut* loadCameraWestCellShortcut = new CSMPrefs::Shortcut("scene-load-cam-westcell", this);
+    connect(loadCameraWestCellShortcut, SIGNAL(activated()), this, SLOT(loadWestCell()));
+
+    CSMPrefs::Shortcut* loadCameraSouthCellShortcut = new CSMPrefs::Shortcut("scene-load-cam-southcell", this);
+    connect(loadCameraSouthCellShortcut, SIGNAL(activated()), this, SLOT(loadSouthCell()));
 }
 
 CSVRender::PagedWorldspaceWidget::~PagedWorldspaceWidget()
@@ -501,12 +513,15 @@ void CSVRender::PagedWorldspaceWidget::useViewHint (const std::string& hint)
             {
                 char ignore1; // : or ;
                 char ignore2; // #
+                // Current coordinate
                 int x, y;
 
+                // Loop throught all the coordinates to add them to selection
                 while (stream >> ignore1 >> ignore2 >> x >> y)
                     selection.add (CSMWorld::CellCoordinates (x, y));
-
-                /// \todo adjust camera position
+                               
+                // Mark that camera needs setup
+                mCamPositionSet=false;
             }
         }
         else if (hint[0]=='r')
@@ -605,6 +620,15 @@ void CSVRender::PagedWorldspaceWidget::clearSelection (int elementMask)
     flagAsModified();
 }
 
+void CSVRender::PagedWorldspaceWidget::invertSelection (int elementMask)
+{
+    for (std::map<CSMWorld::CellCoordinates, Cell *>::iterator iter = mCells.begin();
+        iter!=mCells.end(); ++iter)
+        iter->second->setSelection (elementMask, Cell::Selection_Invert);
+
+    flagAsModified();
+}
+
 void CSVRender::PagedWorldspaceWidget::selectAll (int elementMask)
 {
     for (std::map<CSMWorld::CellCoordinates, Cell *>::iterator iter = mCells.begin();
@@ -632,6 +656,21 @@ std::string CSVRender::PagedWorldspaceWidget::getCellId (const osg::Vec3f& point
         static_cast<int> (std::floor (point.y()/cellSize)));
 
     return cellCoordinates.getId (mWorldspace);
+}
+
+CSVRender::Cell* CSVRender::PagedWorldspaceWidget::getCell(const osg::Vec3d& point) const
+{
+    const int cellSize = 8192;
+
+    CSMWorld::CellCoordinates coords(
+        static_cast<int> (std::floor (point.x()/cellSize)),
+        static_cast<int> (std::floor (point.y()/cellSize)));
+
+    std::map<CSMWorld::CellCoordinates, Cell*>::const_iterator searchResult = mCells.find(coords);
+    if (searchResult != mCells.end())
+        return searchResult->second;
+    else
+        return 0;
 }
 
 std::vector<osg::ref_ptr<CSVRender::TagBase> > CSVRender::PagedWorldspaceWidget::getSelection (
@@ -721,4 +760,29 @@ void CSVRender::PagedWorldspaceWidget::cellAdded (const QModelIndex& index, int 
     /// \todo check if no selected cell is affected and do not update, if that is the case
     if (adjustCells())
         flagAsModified();
+}
+
+void CSVRender::PagedWorldspaceWidget::loadCameraCell()
+{
+    addCellToSceneFromCamera(0, 0);
+}
+
+void CSVRender::PagedWorldspaceWidget::loadEastCell()
+{
+    addCellToSceneFromCamera(1, 0);
+}
+
+void CSVRender::PagedWorldspaceWidget::loadNorthCell()
+{
+    addCellToSceneFromCamera(0, 1);
+}
+
+void CSVRender::PagedWorldspaceWidget::loadWestCell()
+{
+    addCellToSceneFromCamera(-1, 0);
+}
+
+void CSVRender::PagedWorldspaceWidget::loadSouthCell()
+{
+    addCellToSceneFromCamera(0, -1);
 }

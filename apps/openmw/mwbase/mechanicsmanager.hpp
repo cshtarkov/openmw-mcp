@@ -159,12 +159,14 @@ namespace MWBase
             virtual void forceStateUpdate(const MWWorld::Ptr &ptr) = 0;
             ///< Forces an object to refresh its animation state.
 
-            virtual bool playAnimationGroup(const MWWorld::Ptr& ptr, const std::string& groupName, int mode, int number=1) = 0;
+            virtual bool playAnimationGroup(const MWWorld::Ptr& ptr, const std::string& groupName, int mode, int number=1, bool persist=false) = 0;
             ///< Run animation for a MW-reference. Calls to this function for references that are currently not
             /// in the scene should be ignored.
             ///
             /// \param mode 0 normal, 1 immediate start, 2 immediate loop
             /// \param count How many times the animation should be run
+            /// \param persist Whether the animation state should be stored in saved games
+            ///                and persist after cell unload.
             /// \return Success or error
 
             virtual void skipAnimation(const MWWorld::Ptr& ptr) = 0;
@@ -172,6 +174,9 @@ namespace MWBase
             /// references that are currently not in the scene should be ignored.
 
             virtual bool checkAnimationPlaying(const MWWorld::Ptr& ptr, const std::string& groupName) = 0;
+
+            /// Save the current animation state of managed references to their RefData.
+            virtual void persistAnimationStates() = 0;
 
             /// Update magic effects for an actor. Usually done automatically once per frame, but if we're currently
             /// paused we may want to do it manually (after equipping permanent enchantment)
@@ -192,6 +197,8 @@ namespace MWBase
             ///Returns a list of actors who are fighting the given actor within the fAlarmDistance
             /** ie AiCombat is active and the target is the actor **/
             virtual std::list<MWWorld::Ptr> getActorsFighting(const MWWorld::Ptr& actor) = 0;
+
+            virtual std::list<MWWorld::Ptr> getEnemiesNearby(const MWWorld::Ptr& actor) = 0;
 
             virtual void playerLoaded() = 0;
 
@@ -227,6 +234,8 @@ namespace MWBase
             /// Sets the NPC's Acrobatics skill to match the fWerewolfAcrobatics GMST.
             /// It only applies to the current form the NPC is in.
             virtual void applyWerewolfAcrobatics(const MWWorld::Ptr& actor) = 0;
+
+            virtual void cleanupSummonedCreature(const MWWorld::Ptr& caster, int creatureActorId) = 0;
     };
 }
 

@@ -20,7 +20,16 @@ namespace MWMechanics
     class MechanicsManager : public MWBase::MechanicsManager
     {
             MWWorld::Ptr mWatched;
-            NpcStats mWatchedStats;
+
+            AttributeValue mWatchedAttributes[8];
+            SkillValue mWatchedSkills[27];
+
+            DynamicStat<float> mWatchedHealth;
+            DynamicStat<float> mWatchedMagicka;
+            DynamicStat<float> mWatchedFatigue;
+
+            float mWatchedTimeToStartDrowning;
+
             bool mWatchedStatsEmpty;
             bool mUpdatePlayer;
             bool mClassSelected;
@@ -92,7 +101,7 @@ namespace MWMechanics
             virtual int getBarterOffer(const MWWorld::Ptr& ptr,int basePrice, bool buying);
             ///< This is used by every service to determine the price of objects given the trading skills of the player and NPC.
 
-            virtual int getDerivedDisposition(const MWWorld::Ptr& ptr, bool addTemporaryDispositionChange = false);
+            virtual int getDerivedDisposition(const MWWorld::Ptr& ptr, bool addTemporaryDispositionChange = true);
             ///< Calculate the diposition of an NPC toward the player.
 
             virtual int countDeaths (const std::string& id) const;
@@ -137,9 +146,10 @@ namespace MWMechanics
 
             /// Attempt to play an animation group
             /// @return Success or error
-            virtual bool playAnimationGroup(const MWWorld::Ptr& ptr, const std::string& groupName, int mode, int number);
+            virtual bool playAnimationGroup(const MWWorld::Ptr& ptr, const std::string& groupName, int mode, int number, bool persist=false);
             virtual void skipAnimation(const MWWorld::Ptr& ptr);
             virtual bool checkAnimationPlaying(const MWWorld::Ptr& ptr, const std::string &groupName);
+            virtual void persistAnimationStates();
 
             /// Update magic effects for an actor. Usually done automatically once per frame, but if we're currently
             /// paused we may want to do it manually (after equipping permanent enchantment)
@@ -153,6 +163,7 @@ namespace MWMechanics
             virtual std::list<int> getActorsFollowingIndices(const MWWorld::Ptr& actor);
 
             virtual std::list<MWWorld::Ptr> getActorsFighting(const MWWorld::Ptr& actor);
+            virtual std::list<MWWorld::Ptr> getEnemiesNearby(const MWWorld::Ptr& actor);
 
             virtual bool toggleAI();
             virtual bool isAIActive();
@@ -187,6 +198,8 @@ namespace MWMechanics
 
             virtual void setWerewolf(const MWWorld::Ptr& actor, bool werewolf);
             virtual void applyWerewolfAcrobatics(const MWWorld::Ptr& actor);
+
+            virtual void cleanupSummonedCreature(const MWWorld::Ptr& caster, int creatureActorId);
 
         private:
             void reportCrime (const MWWorld::Ptr& ptr, const MWWorld::Ptr& victim,

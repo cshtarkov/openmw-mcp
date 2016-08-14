@@ -19,14 +19,12 @@
 #include "../mwworld/class.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/esmstore.hpp"
-
 #include "../mwworld/inventorystore.hpp"
 
 #include "../mwrender/animation.hpp"
 
 #include "magiceffects.hpp"
 #include "npcstats.hpp"
-#include "summoning.hpp"
 #include "actorutil.hpp"
 
 namespace
@@ -358,6 +356,14 @@ namespace MWMechanics
 
         bool castByPlayer = (!caster.isEmpty() && caster == getPlayer());
 
+        ActiveSpells targetSpells;
+        if (target.getClass().isActor())
+            targetSpells = target.getClass().getCreatureStats(target).getActiveSpells();
+
+        bool canCastAnEffect = false;    // For bound equipment.If this remains false
+                                         // throughout the iteration of this spell's 
+                                         // effects, we display a "can't re-cast" message
+
         for (std::vector<ESM::ENAMstruct>::const_iterator effectIt (effects.mList.begin());
             effectIt!=effects.mList.end(); ++effectIt)
         {
@@ -367,6 +373,16 @@ namespace MWMechanics
             const ESM::MagicEffect *magicEffect =
                 MWBase::Environment::get().getWorld()->getStore().get<ESM::MagicEffect>().find (
                 effectIt->mEffectID);
+
+            // Re-casting a bound equipment effect has no effect if the spell is still active
+            if (magicEffect->mData.mFlags & ESM::MagicEffect::NonRecastable && targetSpells.isSpellActive(mId))
+            {
+                if (effectIt == (effects.mList.end() - 1) && !canCastAnEffect && castByPlayer)
+                    MWBase::Environment::get().getWindowManager()->messageBox("#{sMagicCannotRecast}");
+                continue;
+            }
+            else
+                canCastAnEffect = true;
 
             if (!checkEffectTarget(effectIt->mEffectID, target, castByPlayer))
                 continue;
@@ -510,7 +526,7 @@ namespace MWMechanics
                     std::map<CreatureStats::SummonKey, int>::iterator found = targetStats.getSummonedCreatureMap().find(std::make_pair(effectIt->mEffectID, mId));
                     if (found != targetStats.getSummonedCreatureMap().end())
                     {
-                        cleanupSummonedCreature(targetStats, found->second);
+                        MWBase::Environment::get().getMechanicsManager()->cleanupSummonedCreature(target, found->second);
                         targetStats.getSummonedCreatureMap().erase(found);
                     }
                 }
@@ -576,6 +592,10 @@ namespace MWMechanics
         {
             if (effectId == ESM::MagicEffect::Lock)
             {
+                const MWWorld::ESMStore& store = MWBase::Environment::get().getWorld()->getStore();
+                const ESM::MagicEffect *magiceffect = store.get<ESM::MagicEffect>().find(effectId);
+                MWRender::Animation* animation = MWBase::Environment::get().getWorld()->getAnimation(target);     
+                animation->addSpellCastGlow(magiceffect);
                 if (target.getCellRef().getLockLevel() < magnitude) //If the door is not already locked to a higher value, lock it to spell magnitude
                 {
                     if (caster == getPlayer())
@@ -586,6 +606,10 @@ namespace MWMechanics
             }
             else if (effectId == ESM::MagicEffect::Open)
             {
+                const MWWorld::ESMStore& store = MWBase::Environment::get().getWorld()->getStore();
+                const ESM::MagicEffect *magiceffect = store.get<ESM::MagicEffect>().find(effectId);
+                MWRender::Animation* animation = MWBase::Environment::get().getWorld()->getAnimation(target);     
+                animation->addSpellCastGlow(magiceffect);
                 if (target.getCellRef().getLockLevel() <= magnitude)
                 {
                     if (target.getCellRef().getLockLevel() > 0)
@@ -698,7 +722,7 @@ namespace MWMechanics
 
         const ESM::Enchantment* enchantment = MWBase::Environment::get().getWorld()->getStore().get<ESM::Enchantment>().find(enchantmentName);
 
-        mStack = (enchantment->mData.mType == ESM::Enchantment::CastOnce);
+        mStack = false;
 
         // Check if there's enough charge left
         if (enchantment->mData.mType == ESM::Enchantment::WhenUsed || enchantment->mData.mType == ESM::Enchantment::WhenStrikes)
@@ -838,6 +862,10 @@ namespace MWMechanics
         if (mCaster == getPlayer() && spellIncreasesSkill(spell))
             mCaster.getClass().skillUsageSucceeded(mCaster,
                 spellSchoolToSkill(school), 0);
+    
+        // A non-actor doesn't play its spell cast effects from a character controller, so play them here
+        if (!mCaster.getClass().isActor())
+            playSpellCastingEffects(mId);
 
         inflict(mCaster, mCaster, spell->mEffects, ESM::RT_Self);
 
@@ -930,6 +958,42 @@ namespace MWMechanics
         inflict(mCaster, mCaster, effects, ESM::RT_Self);
 
         return true;
+    }
+
+    void CastSpell::playSpellCastingEffects(const std::string &spellid){
+       
+        const MWWorld::ESMStore& store = MWBase::Environment::get().getWorld()->getStore();
+        const ESM::Spell *spell = store.get<ESM::Spell>().find(spellid);
+        const ESM::ENAMstruct &effectentry = spell->mEffects.mList.at(0);
+
+        const ESM::MagicEffect *effect;
+        effect = store.get<ESM::MagicEffect>().find(effectentry.mEffectID);
+
+        MWRender::Animation* animation = MWBase::Environment::get().getWorld()->getAnimation(mCaster);
+
+        if (mCaster.getClass().isActor()) // TODO: Non-actors (except for large statics?) should also create a spell cast vfx
+        {
+            const ESM::Static* castStatic;
+            if (!effect->mCasting.empty())
+                castStatic = store.get<ESM::Static>().find (effect->mCasting);
+            else
+                castStatic = store.get<ESM::Static>().find ("VFX_DefaultCast");
+
+            animation->addEffect("meshes\\" + castStatic->mModel, effect->mIndex);
+        }
+
+        if (!mCaster.getClass().isActor())
+            animation->addSpellCastGlow(effect);
+
+        static const std::string schools[] = {
+            "alteration", "conjuration", "destruction", "illusion", "mysticism", "restoration"
+        };
+
+        MWBase::SoundManager *sndMgr = MWBase::Environment::get().getSoundManager();
+        if(!effect->mCastSound.empty())
+            sndMgr->playSound3D(mCaster, effect->mCastSound, 1.0f, 1.0f);
+        else
+            sndMgr->playSound3D(mCaster, schools[effect->mData.mSchool]+" cast", 1.0f, 1.0f);
     }
 
     int getEffectiveEnchantmentCastCost(float castCost, const MWWorld::Ptr &actor)

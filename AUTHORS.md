@@ -21,6 +21,8 @@ Programmers
     alexanderkjall
     Alexander Nadeau (wareya)
     Alexander Olofsson (Ace)
+    Allofich
+    AnyOldName3
     Austin Salgat (Salgat)
     Artem Kotsynyak (greye)
     artemutin
@@ -35,6 +37,7 @@ Programmers
     Cory F. Cohen (cfcohen)
     Cris Mihalache (Mirceam)
     darkf
+    devnexen
     Dieho
     Dmitry Shkurskiy (endorph)
     Douglas Diniz (Dgdiniz)
@@ -73,6 +76,7 @@ Programmers
     Lars Söderberg (Lazaroth)
     lazydev
     Leon Saunders (emoose)
+    lohikaarme
     Lukasz Gromanowski (lgro)
     Manuel Edelmann (vorenon)
     Marc Bouvier (CramitDeFrog)
@@ -109,7 +113,7 @@ Programmers
     Robert MacGregor (Ragora)
     Rohit Nirmal
     Roman Melnik (Kromgart)
-    Roman Proskuryakov (humbug)
+    Roman Proskuryakov (kpp)
     Sandy Carter (bwrsandman)
     Scott Howard
     Sebastian Wick (swick)
@@ -118,6 +122,7 @@ Programmers
     smbas
     Stefan Galowicz (bogglez)
     Stanislav Bobrov (Jiub)
+    svaante
     Sylvain Thesnieres (Garvek)
     t6
     terrorfisch

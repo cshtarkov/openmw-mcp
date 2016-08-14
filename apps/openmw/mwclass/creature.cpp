@@ -134,6 +134,9 @@ namespace MWClass
             data->mCreatureStats.setAiSetting (MWMechanics::CreatureStats::AI_Flee, ref->mBase->mAiData.mFlee);
             data->mCreatureStats.setAiSetting (MWMechanics::CreatureStats::AI_Alarm, ref->mBase->mAiData.mAlarm);
 
+            if (data->mCreatureStats.isDead())
+                data->mCreatureStats.setDeathAnimationFinished(true);
+
             // spells
             for (std::vector<std::string>::const_iterator iter (ref->mBase->mSpells.mList.begin());
                 iter!=ref->mBase->mSpells.mList.end(); ++iter)
@@ -242,13 +245,10 @@ namespace MWClass
 
         MWMechanics::applyFatigueLoss(ptr, weapon, attackStrength);
 
-        // TODO: where is the distance defined?
-        float dist = 200.f;
+        float dist = gmst.find("fCombatDistance")->getFloat();
         if (!weapon.isEmpty())
-        {
-            const float fCombatDistance = gmst.find("fCombatDistance")->getFloat();
-            dist = fCombatDistance * weapon.get<ESM::Weapon>()->mBase->mData.mReach;
-        }
+            dist *= weapon.get<ESM::Weapon>()->mBase->mData.mReach;
+
         std::pair<MWWorld::Ptr, osg::Vec3f> result = MWBase::Environment::get().getWorld()->getHitContact(ptr, dist);
         if (result.first.isEmpty())
             return; // Didn't hit anything

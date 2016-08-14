@@ -17,7 +17,7 @@ namespace MWMechanics
     int CreatureStats::sActorId = 0;
 
     CreatureStats::CreatureStats()
-        : mDrawState (DrawState_Nothing), mDead (false), mDied (false), mMurdered(false), mFriendlyHits (0),
+        : mDrawState (DrawState_Nothing), mDead (false), mDeathAnimationFinished(false), mDied (false), mMurdered(false), mFriendlyHits (0),
           mTalkedTo (false), mAlarmed (false), mAttacked (false),
           mKnockdown(false), mKnockdownOneFrame(false), mKnockdownOverOneFrame(false),
           mHitRecovery(false), mBlock(false), mMovementFlags(0),
@@ -157,7 +157,9 @@ namespace MWMechanics
                 int endurance    = getAttribute(ESM::Attribute::Endurance).getModified();
                 DynamicStat<float> fatigue = getFatigue();
                 float diff = (strength+willpower+agility+endurance) - fatigue.getBase();
-                fatigue.modify(diff);
+                float currentToBaseRatio = (fatigue.getCurrent() / fatigue.getBase());
+                fatigue.setModified(fatigue.getModified() + diff, 0);
+                fatigue.setCurrent(fatigue.getBase() * currentToBaseRatio);
                 setFatigue(fatigue);
             }
         }
@@ -236,6 +238,16 @@ namespace MWMechanics
         return mDead;
     }
 
+    bool CreatureStats::isDeathAnimationFinished() const
+    {
+        return mDeathAnimationFinished;
+    }
+
+    void CreatureStats::setDeathAnimationFinished(bool finished)
+    {
+        mDeathAnimationFinished = finished;
+    }
+
     void CreatureStats::notifyDied()
     {
         mDied = true;
@@ -275,6 +287,7 @@ namespace MWMechanics
 
             mDynamic[0].setCurrent(mDynamic[0].getModified());
             mDead = false;
+            mDeathAnimationFinished = false;
         }
     }
 
@@ -482,6 +495,7 @@ namespace MWMechanics
         state.mGoldPool = mGoldPool;
 
         state.mDead = mDead;
+        state.mDeathAnimationFinished = mDeathAnimationFinished;
         state.mDied = mDied;
         state.mMurdered = mMurdered;
         // The vanilla engine does not store friendly hits in the save file. Since there's no other mechanism
@@ -533,6 +547,7 @@ namespace MWMechanics
         mGoldPool = state.mGoldPool;
 
         mDead = state.mDead;
+        mDeathAnimationFinished = state.mDeathAnimationFinished;
         mDied = state.mDied;
         mMurdered = state.mMurdered;
         mTalkedTo = state.mTalkedTo;

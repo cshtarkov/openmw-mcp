@@ -54,8 +54,6 @@ namespace CSVRender
 
             virtual void pathgridDataChanged (const QModelIndex& topLeft, const QModelIndex& bottomRight);
 
-            virtual void pathgridRemoved (const QModelIndex& parent, int start, int end);
-
             virtual void pathgridAboutToBeRemoved (const QModelIndex& parent, int start, int end);
 
             virtual void pathgridAdded (const QModelIndex& parent, int start, int end);
@@ -76,6 +74,8 @@ namespace CSVRender
             /// \note Does not update the view or any cell marker
             void moveCellSelection (int x, int y);
 
+            void addCellToSceneFromCamera (int offsetX, int offsetY);
+
         public:
 
             PagedWorldspaceWidget (QWidget *parent, CSMDoc::Document& document);
@@ -84,7 +84,8 @@ namespace CSVRender
             /// hint system.
 
             virtual ~PagedWorldspaceWidget();
-
+            
+            /// Decodes the the hint string to set of cell that are rendered.
             void useViewHint (const std::string& hint);
 
             void setCellSelection(const CSMWorld::CellSelection& selection);
@@ -108,6 +109,9 @@ namespace CSVRender
             virtual void clearSelection (int elementMask);
 
             /// \param elementMask Elements to be affected by the select operation
+            virtual void invertSelection (int elementMask);
+
+            /// \param elementMask Elements to be affected by the select operation
             virtual void selectAll (int elementMask);
 
             // Select everything that references the same ID as at least one of the elements
@@ -117,6 +121,8 @@ namespace CSVRender
             virtual void selectAllWithSameParentId (int elementMask);
 
             virtual std::string getCellId (const osg::Vec3f& point) const;
+
+            virtual Cell* getCell(const osg::Vec3d& point) const;
 
             virtual std::vector<osg::ref_ptr<TagBase> > getSelection (unsigned int elementMask)
                 const;
@@ -135,7 +141,7 @@ namespace CSVRender
 
             virtual void addEditModeSelectorButtons (CSVWidget::SceneToolMode *tool);
 
-            virtual void handleMouseClick (osg::ref_ptr<TagBase> tag, const std::string& button, bool shift);
+            virtual void handleInteractionPress (const WorldspaceHitResult& hit, InteractionType type);
 
         signals:
 
@@ -148,6 +154,16 @@ namespace CSVRender
             virtual void cellRemoved (const QModelIndex& parent, int start, int end);
 
             virtual void cellAdded (const QModelIndex& index, int start, int end);
+
+            void loadCameraCell();
+
+            void loadEastCell();
+
+            void loadNorthCell();
+
+            void loadWestCell();
+
+            void loadSouthCell();
 
     };
 }

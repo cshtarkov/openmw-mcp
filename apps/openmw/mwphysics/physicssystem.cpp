@@ -280,9 +280,9 @@ namespace MWPhysics
             {
                 velocity = (osg::Quat(refpos.rot[2], osg::Vec3f(0, 0, -1))) * movement;
 
-                if (velocity.z() > 0.f)
+                if (velocity.z() > 0.f && physicActor->getOnGround())
                     inertia = velocity;
-                if(!physicActor->getOnGround())
+                else if(!physicActor->getOnGround())
                 {
                     velocity = velocity + physicActor->getInertialForce();
                 }
@@ -448,6 +448,10 @@ namespace MWPhysics
                 inertia.z() += time * -627.2f;
                 if (inertia.z() < 0)
                     inertia.z() *= slowFall;
+                if (slowFall < 1.f) {
+                    inertia.x() = 0;
+                    inertia.y() = 0;
+                }
                 physicActor->setInertialForce(inertia);
             }
             physicActor->setOnGround(isOnGround);
@@ -946,8 +950,8 @@ namespace MWPhysics
         if (!physactor1 || !physactor2)
             return false;
 
-        osg::Vec3f pos1 (physactor1->getCollisionObjectPosition() + osg::Vec3f(0,0,physactor1->getHalfExtents().z() * 0.8)); // eye level
-        osg::Vec3f pos2 (physactor2->getCollisionObjectPosition() + osg::Vec3f(0,0,physactor2->getHalfExtents().z() * 0.8));
+        osg::Vec3f pos1 (physactor1->getCollisionObjectPosition() + osg::Vec3f(0,0,physactor1->getHalfExtents().z() * 0.9)); // eye level
+        osg::Vec3f pos2 (physactor2->getCollisionObjectPosition() + osg::Vec3f(0,0,physactor2->getHalfExtents().z() * 0.9));
 
         RayResult result = castRay(pos1, pos2, MWWorld::Ptr(), CollisionType_World|CollisionType_HeightMap|CollisionType_Door);
 

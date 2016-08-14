@@ -150,7 +150,7 @@ namespace MWWorld
       mSky (true), mCells (mStore, mEsm),
       mGodMode(false), mScriptsEnabled(true), mContentFiles (contentFiles),
       mActivationDistanceOverride (activationDistanceOverride), mStartupScript(startupScript),
-      mStartCell (startCell), mTeleportEnabled(true),
+      mStartCell (startCell), mDistanceToFacedObject(-1), mTeleportEnabled(true),
       mLevitationEnabled(true), mGoToJail(false), mDaysInPrison(0)
     {
         mPhysics = new MWPhysics::PhysicsSystem(resourceSystem, rootNode);
@@ -804,6 +804,9 @@ namespace MWWorld
 
         mWeatherManager->advanceTime (hours, incremental);
 
+        if (!incremental)
+            mProjectileManager->clear();
+
         hours += mGameHour->getFloat();
 
         setHour (hours);
@@ -972,7 +975,7 @@ namespace MWWorld
     {
         mPhysics->clearQueuedMovement();
 
-        if (changeEvent && mCurrentWorldSpace != "sys::default") // FIXME
+        if (changeEvent && mCurrentWorldSpace != ESM::CellId::sDefaultWorldspace)
         {
             // changed worldspace
             mProjectileManager->clear();
@@ -1005,7 +1008,7 @@ namespace MWWorld
             return static_cast<float>(mActivationDistanceOverride);
 
         static const int iMaxActivateDist = getStore().get<ESM::GameSetting>().find("iMaxActivateDist")->getInt();
-        return iMaxActivateDist * 5.f / 4.f;
+        return static_cast<float>(iMaxActivateDist);
     }
 
     MWWorld::Ptr World::getFacedObject()
@@ -1024,11 +1027,19 @@ namespace MWWorld
 
             float activationDistance = getMaxActivationDistance() + telekinesisRangeBonus;
 
-            facedObject = getFacedObject(activationDistance);
-        }
+            facedObject = getFacedObject(activationDistance, true);
 
+            if (!facedObject.isEmpty() && !facedObject.getClass().allowTelekinesis(facedObject)
+                && mDistanceToFacedObject > getMaxActivationDistance())
+                return 0;
+        }
         return facedObject;
     }
+
+   float World::getDistanceToFacedObject()
+   {
+        return mDistanceToFacedObject;
+   }
 
     osg::Matrixf World::getActorHeadTransform(const MWWorld::ConstPtr& actor) const
     {
@@ -1047,13 +1058,25 @@ namespace MWWorld
         return osg::Matrixf::translate(actor.getRefData().getPosition().asVec3());
     }
 
-
     std::pair<MWWorld::Ptr,osg::Vec3f> World::getHitContact(const MWWorld::ConstPtr &ptr, float distance)
     {
         const ESM::Position &posdata = ptr.getRefData().getPosition();
 
         osg::Quat rot = osg::Quat(posdata.rot[0], osg::Vec3f(-1,0,0)) * osg::Quat(posdata.rot[2], osg::Vec3f(0,0,-1));
-        osg::Vec3f pos = getActorHeadTransform(ptr).getTrans();
+
+        osg::Vec3f pos = ptr.getRefData().getPosition().asVec3();
+
+        if (ptr == getPlayerPtr())
+            pos = getActorHeadTransform(ptr).getTrans(); // special cased for better aiming with the camera
+        else
+        {
+            // general case, compatible with all types of different creatures
+            // note: we intentionally do *not* use the collision box offset here, this is required to make
+            // some flying creatures work that have their collision box offset in the air
+            osg::Vec3f halfExtents = mPhysics->getHalfExtents(ptr);
+            pos.z() += halfExtents.z() * 2 * 0.75;
+            distance += halfExtents.y();
+        }
 
         std::pair<MWWorld::Ptr,osg::Vec3f> result = mPhysics->getHitContact(ptr, pos, rot, distance);
         if(result.first.isEmpty())
@@ -1326,10 +1349,11 @@ namespace MWWorld
 
         int fallbackDirections[4] = {direction, (direction+3)%4, (direction+2)%4, (direction+1)%4};
 
+        osg::Vec3f spawnPoint = pos;
+
         for (int i=0; i<4; ++i)
         {
             direction = fallbackDirections[i];
-            osg::Vec3f spawnPoint = pos;
             if (direction == 0) spawnPoint = pos + (orientation * osg::Vec3f(0,1,0)) * distance;
             else if(direction == 1) spawnPoint = pos - (orientation * osg::Vec3f(0,1,0)) * distance;
             else if(direction == 2) spawnPoint = pos - (orientation * osg::Vec3f(1,0,0)) * distance;
@@ -1345,12 +1369,12 @@ namespace MWWorld
                                                                pos.x(), pos.y(), pos.z() + 20))
             {
                 // safe
-                ipos.pos[0] = spawnPoint.x();
-                ipos.pos[1] = spawnPoint.y();
-                ipos.pos[2] = spawnPoint.z();
                 break;
             }
         }
+        ipos.pos[0] = spawnPoint.x();
+        ipos.pos[1] = spawnPoint.y();
+        ipos.pos[2] = spawnPoint.z();
 
         if (!referenceObject.getClass().isActor())
         {
@@ -1698,18 +1722,26 @@ namespace MWWorld
 
     MWWorld::Ptr World::getFacedObject(float maxDistance, bool ignorePlayer)
     {
-        maxDistance += mRendering->getCameraDistance();
+        const float camDist = mRendering->getCameraDistance();
+        maxDistance += camDist;
+        MWWorld::Ptr facedObject;
+        MWRender::RenderingManager::RayResult rayToObject;
 
         if (MWBase::Environment::get().getWindowManager()->isGuiMode())
         {
             float x, y;
             MWBase::Environment::get().getWindowManager()->getMousePosition(x, y);
-            return mRendering->castCameraToViewportRay(x, y, maxDistance, ignorePlayer).mHitObject;
+            rayToObject = mRendering->castCameraToViewportRay(x, y, maxDistance, ignorePlayer);
         }
         else
-        {
-            return mRendering->castCameraToViewportRay(0.5f, 0.5f, maxDistance, ignorePlayer).mHitObject;
-        }
+            rayToObject = mRendering->castCameraToViewportRay(0.5f, 0.5f, maxDistance, ignorePlayer);
+
+        facedObject = rayToObject.mHitObject;
+        if (rayToObject.mHit)
+            mDistanceToFacedObject = (rayToObject.mRatio * maxDistance) - camDist;
+        else
+            mDistanceToFacedObject = -1;
+        return facedObject;
     }
 
     bool World::isCellExterior() const
@@ -2674,6 +2706,7 @@ namespace MWWorld
 
     void World::breakInvisibility(const Ptr &actor)
     {
+        actor.getClass().getCreatureStats(actor).getSpells().purgeEffect(ESM::MagicEffect::Invisibility);
         actor.getClass().getCreatureStats(actor).getActiveSpells().purgeEffect(ESM::MagicEffect::Invisibility);
         if (actor.getClass().hasInventoryStore(actor))
             actor.getClass().getInventoryStore(actor).purgeEffect(ESM::MagicEffect::Invisibility);
@@ -3174,13 +3207,10 @@ namespace MWWorld
     {
         breakInvisibility(actor);
 
-        if (mScriptsEnabled)
+        if (object.getRefData().activate())
         {
-            if (object.getRefData().activate())
-            {
-                boost::shared_ptr<MWWorld::Action> action = (object.getClass().activate(object, actor));
-                action->execute (actor);
-            }
+            boost::shared_ptr<MWWorld::Action> action = (object.getClass().activate(object, actor));
+            action->execute (actor);
         }
     }
 
@@ -3188,8 +3218,6 @@ namespace MWWorld
     {
         bool operator() (Ptr ptr)
         {
-            // Can't reset actors that were moved to a different cell, because we don't know what cell they came from.
-            // This could be fixed once we properly track actor cell changes, but may not be desirable behaviour anyhow.
             if (ptr.getClass().isActor() && ptr.getCellRef().hasContentFile())
             {
                 const ESM::Position& origPos = ptr.getCellRef().getPosition();
@@ -3221,15 +3249,19 @@ namespace MWWorld
 
     osg::Vec3f World::aimToTarget(const ConstPtr &actor, const MWWorld::ConstPtr& target)
     {
-        osg::Vec3f weaponPos = getActorHeadTransform(actor).getTrans();
+        osg::Vec3f weaponPos = actor.getRefData().getPosition().asVec3();
+        weaponPos.z() += mPhysics->getHalfExtents(actor).z() * 2 * 0.75;
         osg::Vec3f targetPos = mPhysics->getCollisionObjectPosition(target);
         return (targetPos - weaponPos);
     }
 
     float World::getHitDistance(const ConstPtr &actor, const ConstPtr &target)
     {
-        osg::Vec3f weaponPos = getActorHeadTransform(actor).getTrans();
-        return mPhysics->getHitDistance(weaponPos, target);
+        osg::Vec3f weaponPos = actor.getRefData().getPosition().asVec3();
+        osg::Vec3f halfExtents = mPhysics->getHalfExtents(actor);
+        weaponPos.z() += halfExtents.z() * 2 * 0.75;
+
+        return mPhysics->getHitDistance(weaponPos, target) - halfExtents.y();
     }
 
     void World::preloadCommonAssets()

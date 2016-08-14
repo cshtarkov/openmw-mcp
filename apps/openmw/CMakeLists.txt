@@ -84,7 +84,7 @@ add_openmw_dir (mwmechanics
     drawstate spells activespells npcstats aipackage aisequence aipursue alchemy aiwander aitravel aifollow aiavoiddoor
     aiescort aiactivate aicombat repair enchanting pathfinding pathgrid security spellsuccess spellcasting
     disease pickpocket levelledlist combat steering obstacle autocalcspell difficultyscaling aicombataction actor summoning
-    character actors objects aistate coordinateconverter
+    character actors objects aistate coordinateconverter trading aiface
     )
 
 add_openmw_dir (mwstate
@@ -132,7 +132,6 @@ target_link_libraries(openmw
     ${Boost_PROGRAM_OPTIONS_LIBRARY}
     ${OPENAL_LIBRARY}
     ${FFmpeg_LIBRARIES}
-    ${BULLET_LIBRARIES}
     ${MYGUI_LIBRARIES}
     ${SDL2_LIBRARY}
     "osg-ffmpeg-videoplayer"
@@ -166,7 +165,7 @@ if (ANDROID)
 endif (ANDROID)
 
 if (USE_SYSTEM_TINYXML)
-    target_link_libraries(openmw ${TINYXML_LIBRARIES})
+    target_link_libraries(openmw ${TinyXML_LIBRARIES})
 endif()
 
 if (NOT UNIX)
