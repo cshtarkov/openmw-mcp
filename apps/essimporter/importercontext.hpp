@@ -9,6 +9,7 @@
 #include <components/esm/globalmap.hpp>
 #include <components/esm/loadcrea.hpp>
 #include <components/esm/loadnpc.hpp>
+#include <components/esm/controlsstate.hpp>
 
 #include "importnpcc.hpp"
 #include "importcrec.hpp"
@@ -31,6 +32,8 @@ namespace ESSImport
         std::string mCustomPlayerClassName;
 
         ESM::DialogueState mDialogueState;
+
+        ESM::ControlsState mControlsState;
 
         // cells which should show an explored overlay on the global map
         std::set<std::pair<int, int> > mExploredCells;
@@ -59,10 +62,14 @@ namespace ESSImport
             playerCellId.mPaged = true;
             playerCellId.mIndex.mX = playerCellId.mIndex.mY = 0;
             mPlayer.mCellId = playerCellId;
-            //mPlayer.mLastKnownExteriorPosition
-            mPlayer.mHasMark = 0; // TODO
+            mPlayer.mLastKnownExteriorPosition[0]
+                = mPlayer.mLastKnownExteriorPosition[1]
+                = mPlayer.mLastKnownExteriorPosition[2]
+                = 0.0f;
+            mPlayer.mHasMark = 0;
             mPlayer.mCurrentCrimeId = 0; // TODO
             mPlayer.mObject.blank();
+            mPlayer.mObject.mEnabled = true;
             mPlayer.mObject.mRef.mRefID = "player"; // REFR.mRefID would be PlayerSaveGame
 
             mGlobalMapState.mBounds.mMinX = 0;

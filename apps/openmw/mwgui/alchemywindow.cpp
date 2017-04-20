@@ -122,7 +122,7 @@ namespace MWGui
             if (!iter->isEmpty())
             {
                 mApparatus.at (index)->setUserString ("ToolTipType", "ItemPtr");
-                mApparatus.at (index)->setUserData (*iter);
+                mApparatus.at (index)->setUserData (MWWorld::Ptr(*iter));
             }
         }
 
@@ -190,9 +190,9 @@ namespace MWGui
                 continue;
 
             ingredient->setUserString("ToolTipType", "ItemPtr");
-            ingredient->setUserData(item);
+            ingredient->setUserData(MWWorld::Ptr(item));
 
-            ingredient->setCount(ingredient->getUserData<MWWorld::Ptr>()->getRefData().getCount());
+            ingredient->setCount(item.getRefData().getCount());
         }
 
         mItemView->update();
@@ -200,15 +200,15 @@ namespace MWGui
         std::set<MWMechanics::EffectKey> effectIds = mAlchemy->listEffects();
         Widgets::SpellEffectList list;
         unsigned int effectIndex=0;
-        for (std::set<MWMechanics::EffectKey>::iterator it = effectIds.begin(); it != effectIds.end(); ++it)
+        for (std::set<MWMechanics::EffectKey>::iterator it2 = effectIds.begin(); it2 != effectIds.end(); ++it2)
         {
             Widgets::SpellEffectParams params;
-            params.mEffectID = it->mId;
-            const ESM::MagicEffect* magicEffect = MWBase::Environment::get().getWorld()->getStore().get<ESM::MagicEffect>().find(it->mId);
+            params.mEffectID = it2->mId;
+            const ESM::MagicEffect* magicEffect = MWBase::Environment::get().getWorld()->getStore().get<ESM::MagicEffect>().find(it2->mId);
             if (magicEffect->mData.mFlags & ESM::MagicEffect::TargetSkill)
-                params.mSkill = it->mArg;
+                params.mSkill = it2->mArg;
             else if (magicEffect->mData.mFlags & ESM::MagicEffect::TargetAttribute)
-                params.mAttribute = it->mArg;
+                params.mAttribute = it2->mArg;
             params.mIsConstant = true;
             params.mNoTarget = true;
 

@@ -16,6 +16,8 @@ namespace MWClass
 
             virtual void insertObject(const MWWorld::Ptr& ptr, const std::string& model, MWPhysics::PhysicsSystem& physics) const;
 
+            virtual bool useAnim() const;
+
             virtual std::string getName (const MWWorld::ConstPtr& ptr) const;
             ///< \return name (the one that is to be presented to the user; not the internal one);
             /// can return an empty string.
@@ -25,6 +27,8 @@ namespace MWClass
 
             virtual MWGui::ToolTipInfo getToolTipInfo (const MWWorld::ConstPtr& ptr, int count) const;
             ///< @return the content of the tool tip to be displayed. raises exception if the object has no tooltip.
+
+            virtual bool showsInInventory (const MWWorld::ConstPtr& ptr) const;
 
             virtual boost::shared_ptr<MWWorld::Action> activate (const MWWorld::Ptr& ptr,
                 const MWWorld::Ptr& actor) const;

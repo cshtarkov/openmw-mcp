@@ -85,7 +85,7 @@ namespace Shader
         if (!node.getStateSet())
             return node.getOrCreateStateSet();
 
-        osg::ref_ptr<osg::StateSet> newStateSet = osg::clone(node.getStateSet(), osg::CopyOp::SHALLOW_COPY);
+        osg::ref_ptr<osg::StateSet> newStateSet = new osg::StateSet(*node.getStateSet(), osg::CopyOp::SHALLOW_COPY);
         node.setStateSet(newStateSet);
         return newStateSet.get();
     }
@@ -152,13 +152,13 @@ namespace Shader
                 }
             }
 
-            if (mAutoUseNormalMaps && diffuseMap != NULL && normalMap == NULL)
+            if (mAutoUseNormalMaps && diffuseMap != NULL && normalMap == NULL && diffuseMap->getImage(0))
             {
-                std::string normalMap = diffuseMap->getImage(0)->getFileName();
+                std::string normalMapFileName = diffuseMap->getImage(0)->getFileName();
 
                 osg::ref_ptr<osg::Image> image;
                 bool normalHeight = false;
-                std::string normalHeightMap = normalMap;
+                std::string normalHeightMap = normalMapFileName;
                 boost::replace_last(normalHeightMap, ".", mNormalHeightMapPattern + ".");
                 if (mImageManager.getVFS()->exists(normalHeightMap))
                 {
@@ -167,10 +167,10 @@ namespace Shader
                 }
                 else
                 {
-                    boost::replace_last(normalMap, ".", mNormalMapPattern + ".");
-                    if (mImageManager.getVFS()->exists(normalMap))
+                    boost::replace_last(normalMapFileName, ".", mNormalMapPattern + ".");
+                    if (mImageManager.getVFS()->exists(normalMapFileName))
                     {
-                        image = mImageManager.getImage(normalMap);
+                        image = mImageManager.getImage(normalMapFileName);
                     }
                 }
 
@@ -194,13 +194,13 @@ namespace Shader
                     mRequirements.back().mNormalHeight = normalHeight;
                 }
             }
-            if (mAutoUseSpecularMaps && diffuseMap != NULL && specularMap == NULL)
+            if (mAutoUseSpecularMaps && diffuseMap != NULL && specularMap == NULL && diffuseMap->getImage(0))
             {
-                std::string specularMap = diffuseMap->getImage(0)->getFileName();
-                boost::replace_last(specularMap, ".", mSpecularMapPattern + ".");
-                if (mImageManager.getVFS()->exists(specularMap))
+                std::string specularMapFileName = diffuseMap->getImage(0)->getFileName();
+                boost::replace_last(specularMapFileName, ".", mSpecularMapPattern + ".");
+                if (mImageManager.getVFS()->exists(specularMapFileName))
                 {
-                    osg::ref_ptr<osg::Texture2D> specularMapTex (new osg::Texture2D(mImageManager.getImage(specularMap)));
+                    osg::ref_ptr<osg::Texture2D> specularMapTex (new osg::Texture2D(mImageManager.getImage(specularMapFileName)));
                     specularMapTex->setWrap(osg::Texture::WRAP_S, diffuseMap->getWrap(osg::Texture::WRAP_S));
                     specularMapTex->setWrap(osg::Texture::WRAP_T, diffuseMap->getWrap(osg::Texture::WRAP_T));
                     specularMapTex->setFilter(osg::Texture::MIN_FILTER, diffuseMap->getFilter(osg::Texture::MIN_FILTER));
@@ -272,6 +272,9 @@ namespace Shader
         {
             switch (reqs.mVertexColorMode)
             {
+            case GL_AMBIENT:
+                defineMap["colorMode"] = "3";
+                break;
             default:
             case GL_AMBIENT_AND_DIFFUSE:
                 defineMap["colorMode"] = "2";
@@ -314,34 +317,43 @@ namespace Shader
         {
             const ShaderRequirements& reqs = mRequirements.back();
 
-            osg::ref_ptr<osg::Geometry> sourceGeometry = &geometry;
-            SceneUtil::RigGeometry* rig = dynamic_cast<SceneUtil::RigGeometry*>(&geometry);
-            if (rig)
-                sourceGeometry = rig->getSourceGeometry();
+            bool useShader = reqs.mShaderRequired || mForceShaders;
+            bool generateTangents = reqs.mTexStageRequiringTangents != -1;
 
-            if (mAllowedToModifyStateSets)
+            if (mAllowedToModifyStateSets && (useShader || generateTangents))
             {
+                osg::ref_ptr<osg::Geometry> sourceGeometry = &geometry;
+                SceneUtil::RigGeometry* rig = dynamic_cast<SceneUtil::RigGeometry*>(&geometry);
+                if (rig)
+                    sourceGeometry = rig->getSourceGeometry();
+
+                bool requiresSetGeometry = false;
+
                 // make sure that all UV sets are there
                 for (std::map<int, std::string>::const_iterator it = reqs.mTextures.begin(); it != reqs.mTextures.end(); ++it)
                 {
                     if (sourceGeometry->getTexCoordArray(it->first) == NULL)
+                    {
                         sourceGeometry->setTexCoordArray(it->first, sourceGeometry->getTexCoordArray(0));
+                        requiresSetGeometry = true;
+                    }
                 }
+
+                if (generateTangents)
+                {
+                    osg::ref_ptr<osgUtil::TangentSpaceGenerator> generator (new osgUtil::TangentSpaceGenerator);
+                    generator->generate(sourceGeometry, reqs.mTexStageRequiringTangents);
+
+                    sourceGeometry->setTexCoordArray(7, generator->getTangentArray(), osg::Array::BIND_PER_VERTEX);
+                    requiresSetGeometry = true;
+                }
+
+                if (rig && requiresSetGeometry)
+                    rig->setSourceGeometry(sourceGeometry);
             }
-
-            if (reqs.mTexStageRequiringTangents != -1 && mAllowedToModifyStateSets)
-            {
-                osg::ref_ptr<osgUtil::TangentSpaceGenerator> generator (new osgUtil::TangentSpaceGenerator);
-                generator->generate(sourceGeometry, reqs.mTexStageRequiringTangents);
-
-                sourceGeometry->setTexCoordArray(7, generator->getTangentArray(), osg::Array::BIND_PER_VERTEX);
-            }
-
-            if (rig)
-                rig->setSourceGeometry(sourceGeometry);
 
             // TODO: find a better place for the stateset
-            if (reqs.mShaderRequired || mForceShaders)
+            if (useShader)
                 createProgram(reqs, geometry);
         }
 

@@ -51,8 +51,11 @@ namespace MWClass
             MWBase::Environment::get().getSoundManager()->playSound3D(ptr, ref->mBase->mSound, 1.0, 1.0,
                                                                       MWBase::SoundManager::Play_TypeSfx,
                                                                       MWBase::SoundManager::Play_Loop);
+    }
 
-        MWBase::Environment::get().getMechanicsManager()->add(ptr);
+    bool Light::useAnim() const
+    {
+        return true;
     }
 
     std::string Light::getModel(const MWWorld::ConstPtr &ptr) const
@@ -173,6 +176,16 @@ namespace MWClass
         return info;
     }
 
+    bool Light::showsInInventory (const MWWorld::ConstPtr& ptr) const
+    {
+        const ESM::Light* light = ptr.get<ESM::Light>()->mBase;
+
+        if (!(light->mData.mFlags & ESM::Light::Carry))
+            return false;
+
+        return Class::showsInInventory(ptr);
+    }
+
     boost::shared_ptr<MWWorld::Action> Light::use (const MWWorld::Ptr& ptr) const
     {
         boost::shared_ptr<MWWorld::Action> action(new MWWorld::ActionEquip(ptr));
@@ -220,8 +233,8 @@ namespace MWClass
         if (!(ref->mBase->mData.mFlags & ESM::Light::Carry))
             return std::make_pair(0,"");
 
-        MWWorld::InventoryStore& invStore = npc.getClass().getInventoryStore(npc);
-        MWWorld::ContainerStoreIterator weapon = invStore.getSlot(MWWorld::InventoryStore::Slot_CarriedRight);
+        const MWWorld::InventoryStore& invStore = npc.getClass().getInventoryStore(npc);
+        MWWorld::ConstContainerStoreIterator weapon = invStore.getSlot(MWWorld::InventoryStore::Slot_CarriedRight);
 
         if(weapon == invStore.end())
             return std::make_pair(1,"");

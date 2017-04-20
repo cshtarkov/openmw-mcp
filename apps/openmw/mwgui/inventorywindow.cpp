@@ -56,7 +56,7 @@ namespace
 namespace MWGui
 {
 
-    InventoryWindow::InventoryWindow(DragAndDrop* dragAndDrop, osgViewer::Viewer* viewer, Resource::ResourceSystem* resourceSystem)
+    InventoryWindow::InventoryWindow(DragAndDrop* dragAndDrop, osg::Group* parent, Resource::ResourceSystem* resourceSystem)
         : WindowPinnableBase("openmw_inventory_window.layout")
         , mDragAndDrop(dragAndDrop)
         , mSelectedItem(-1)
@@ -65,7 +65,7 @@ namespace MWGui
         , mGuiMode(GM_Inventory)
         , mLastXSize(0)
         , mLastYSize(0)
-        , mPreview(new MWRender::InventoryPreview(viewer, resourceSystem, MWMechanics::getPlayer()))
+        , mPreview(new MWRender::InventoryPreview(parent, resourceSystem, MWMechanics::getPlayer()))
         , mTrading(false)
     {
         mPreviewTexture.reset(new osgMyGUI::OSGTexture(mPreview->getTexture()));
@@ -136,6 +136,18 @@ namespace MWGui
         dirtyPreview();
 
         updatePreviewSize();
+
+        updateEncumbranceBar();
+        mItemView->update();
+        notifyContentChanged();
+    }
+
+    void InventoryWindow::clear()
+    {
+        mPtr = MWWorld::Ptr();
+        mTradeModel = NULL;
+        mSortModel = NULL;
+        mItemView->setModel(NULL);
     }
 
     void InventoryWindow::setGuiMode(GuiMode mode)
@@ -340,13 +352,12 @@ namespace MWGui
 
     void InventoryWindow::open()
     {
-        mPtr = MWMechanics::getPlayer();
-
-        updateEncumbranceBar();
-
-        mItemView->update();
-
-        notifyContentChanged();
+        if (!mPtr.isEmpty())
+        {
+            updateEncumbranceBar();
+            mItemView->update();
+            notifyContentChanged();
+        }
         adjustPanes();
     }
 
@@ -545,10 +556,7 @@ namespace MWGui
         if(invStore.getSlot(slot) != invStore.end())
         {
             MWWorld::Ptr item = *invStore.getSlot(slot);
-            // NOTE: Don't allow users to select WerewolfRobe objects in the inventory. Vanilla
-            // likely uses a hack like this since there's no other way to prevent it from being
-            // taken.
-            if(item.getCellRef().getRefId() == "werewolfrobe")
+            if (!item.getClass().showsInInventory(item))
                 return MWWorld::Ptr();
             return item;
         }

@@ -6,7 +6,8 @@
 namespace MWMechanics
 {
 
-bool applyOnStrikeEnchantment(const MWWorld::Ptr& attacker, const MWWorld::Ptr& victim, const MWWorld::Ptr& object, const osg::Vec3f& hitPosition);
+bool applyOnStrikeEnchantment(const MWWorld::Ptr& attacker, const MWWorld::Ptr& victim, const MWWorld::Ptr& object, const osg::Vec3f& hitPosition,
+                              const bool fromProjectile=false);
 
 /// @return can we block the attack?
 bool blockMeleeAttack (const MWWorld::Ptr& attacker, const MWWorld::Ptr& blocker, const MWWorld::Ptr& weapon, float damage, float attackStrength);
@@ -42,6 +43,7 @@ void applyFatigueLoss(const MWWorld::Ptr& attacker, const MWWorld::Ptr& weapon, 
 /// e.g. If attacker is a fish, is victim in water? Or, if attacker can't swim, is victim on land?
 bool isEnvironmentCompatible(const MWWorld::Ptr& attacker, const MWWorld::Ptr& victim);
 
+float getFightDistanceBias(const MWWorld::Ptr& actor1, const MWWorld::Ptr& actor2);
 }
 
 #endif

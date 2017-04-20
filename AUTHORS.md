@@ -17,16 +17,19 @@ Programmers
     aegis
     Aleksandar Jovanov
     Alex Haddad (rainChu)
-    Alex McKibben (WeirdSexy)
+    Alex McKibben
     alexanderkjall
     Alexander Nadeau (wareya)
     Alexander Olofsson (Ace)
     Allofich
+    Andrei Kortunov (akortunov)
     AnyOldName3
+    Aussiemon
     Austin Salgat (Salgat)
     Artem Kotsynyak (greye)
     artemutin
     Arthur Moore (EmperorArthur)
+    Assumeru
     athile
     Ben Shealy (bentsherman)
     Bret Curtis (psi29a)
@@ -51,6 +54,7 @@ Programmers
     eroen
     escondida
     Evgeniy Mineev (sandstranger)
+    Federico Guerra (FedeWar)
     Fil Krynicki (filkry)
     Gašper Sedej
     gugus/gus
@@ -69,13 +73,17 @@ Programmers
     John Blomberg (fstp)
     Jordan Ayers
     Jordan Milne
+    Jules Blok (Armada651)
     Julien Voisin (jvoisin/ap0)
     Karl-Felix Glatzer (k1ll)
     Kevin Poitra (PuppyKevin)
     Koncord
+    Kurnevsky Evgeny (kurnevsky)
     Lars Söderberg (Lazaroth)
     lazydev
+    Leon Krieg (lkrieg)
     Leon Saunders (emoose)
+    logzero
     lohikaarme
     Lukasz Gromanowski (lgro)
     Manuel Edelmann (vorenon)
@@ -84,6 +92,7 @@ Programmers
     Mark Siewert (mark76)
     Marco Melletti (mellotanica)
     Marco Schulze
+    Martin Otto (MAtahualpa)
     Mateusz Kołaczek (PL_kolek)
     Mateusz Malisz (malice)
     megaton
@@ -94,6 +103,7 @@ Programmers
     Michał Moroz (dragonee)
     Miroslav Puda (pakanek)
     MiroslavR
+    Mitchell Schwitzer (schwitzerm)
     naclander
     Narmo
     Nathan Jeffords (blunted2night)
@@ -101,12 +111,14 @@ Programmers
     Nikolay Kasyanov (corristo)
     nobrakal
     Nolan Poe (nopoe)
+    Oleg Chkan (mrcheko)
     Paul Cercueil (pcercuei)
     Paul McElroy (Greendogo)
     Pi03k
     Pieter van der Kloet (pvdk)
     pkubik
     Radu-Marius Popovici (rpopovici)
+    Rafael Moura (dhustkoder)
     rdimesio
     riothamus
     Rob Cutmore (rcutmore)
@@ -118,10 +130,12 @@ Programmers
     Scott Howard
     Sebastian Wick (swick)
     Sergey Shambir
+    ShadowRadiance
     sir_herrbatka
     smbas
     Stefan Galowicz (bogglez)
     Stanislav Bobrov (Jiub)
+    stil-t
     svaante
     Sylvain Thesnieres (Garvek)
     t6
@@ -134,19 +148,21 @@ Programmers
     vocollapse
     zelurker
 
-Manual
-------
+Documentation
+-------------
 
-    Bodillium
-    Cramal
     Alejandro Sanchez (HiPhish)
+    Bodillium
+    Bret Curtis (psi29a)
+    Cramal
+    Ryan Tucker (Ravenwing)
     sir_herrbatka
 
 Packagers
 ---------
 
     Alexander Olofsson (Ace) - Windows
-    Bret Curtis (psi29a) - Ubuntu Linux
+    Bret Curtis (psi29a) - Debian and Ubuntu Linux
     Edmondo Tommasina (edmondo) - Gentoo Linux
     Julian Ospald (hasufell) - Gentoo Linux
     Karl-Felix Glatzer (k1ll) - Linux Binaries
@@ -157,16 +173,16 @@ Packagers
 Public Relations and Translations
 ---------------------------------
 
-    Alex McKibben (WeirdSexy) - Podcaster
     Artem Kotsynyak (greye) - Russian News Writer
+    Dawid Lakomy (Vedyimyn) - Polish News Writer
     Jim Clauwaert (Zedd) - Public Outreach
     Julien Voisin (jvoisin/ap0) - French News Writer
-    Tom Koenderink (Okulo) - English News Writer
     Lukasz Gromanowski (lgro) - English News Writer
+    Martin Otto (Atahualpa) - Podcaster, Public Outreach, German Translator
     Mickey Lyle (raevol) - Release Manager
     Pithorn - Chinese News Writer
     sir_herrbatka - Polish News Writer
-    Dawid Lakomy (Vedyimyn) - Polish News Writer
+    Tom Koenderink (Okulo) - English News Writer
 
 Website
 -------
@@ -217,7 +233,6 @@ Inactive Contributors
     Nekochan
     pchan3
     penguinroad
-    psi29a
     sergoz
     spyboot
     Star-Demon

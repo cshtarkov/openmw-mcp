@@ -9,6 +9,7 @@
         <Property key="MinTrackSize" value="14"/>
         <Property key="VerticalAlignment" value="false"/>
         <Property key="MoveToClick" value="true"/>
+        <Property key="TrackFill" value="1"/>
 
         <Property key="WheelPage" value="36"/>
         <Property key="ViewPage" value="36"/>
@@ -50,6 +51,7 @@
         <Property key="TrackRangeMargins" value="20 19"/>
         <Property key="MinTrackSize" value="14"/>
         <Property key="MoveToClick" value="true"/>
+        <Property key="TrackFill" value="1"/>
 
         <Property key="WheelPage" value="36"/>
         <Property key="ViewPage" value="36"/>
@@ -129,9 +131,9 @@
 
         <Child type="Widget" skin="MW_Box" offset="0 0 516 516" align="Stretch"/>
 
-        <Child type="MWScrollBar" skin="MW_VScroll" offset="498 3 14 509" align="Right VStretch" name="VScroll"/>
+        <Child type="MWScrollBar" skin="MW_VScroll" offset="498 4 14 508" align="Right VStretch" name="VScroll"/>
 
-        <Child type="Widget" skin="" offset="3 3 493 509" align="Stretch" name="Client"/>
+        <Child type="Widget" skin="" offset="3 4 493 508" align="Stretch" name="Client"/>
 
     </Resource>
 
@@ -152,6 +154,15 @@
         <Child type="Widget" skin="MW_Box" offset="0 0 516 516" align="Stretch"/>
 
         <Child type="ScrollView" skin="MW_ScrollViewH" offset="3 3 509 509" align="Stretch" name="ScrollView">
+            <Property key="CanvasAlign" value="Left Top"/>
+            <Property key="NeedMouse" value="true"/>
+        </Child>
+    </Resource>
+
+    <Resource type="ResourceSkin" name="MW_ItemChargeView" size="516 516" align="Left Top">
+        <Child type="Widget" skin="MW_Box" offset="0 0 516 516" align="Stretch"/>
+
+        <Child type="ScrollView" skin="MW_ScrollView" offset="3 3 509 509" align="Stretch" name="ScrollView">
             <Property key="CanvasAlign" value="Left Top"/>
             <Property key="NeedMouse" value="true"/>
         </Child>

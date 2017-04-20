@@ -202,7 +202,7 @@ public:
         bool isDeleted = false;
 
         book.load(esm, isDeleted);
-        if (book.mData.mSkillID == -1)
+        if (book.mData.mSkillId == -1)
             mContext->mPlayer.mObject.mNpcStats.mUsedIds.push_back(Misc::StringUtils::lowerCase(book.mId));
 
         mRecords[book.mId] = book;
@@ -271,23 +271,34 @@ private:
 class ConvertPCDT : public Converter
 {
 public:
-    ConvertPCDT() : mFirstPersonCam(true) {}
+    ConvertPCDT()
+        : mFirstPersonCam(true),
+          mTeleportingEnabled(true),
+          mLevitationEnabled(true)
+    {}
 
     virtual void read(ESM::ESMReader &esm)
     {
         PCDT pcdt;
         pcdt.load(esm);
 
-        convertPCDT(pcdt, mContext->mPlayer, mContext->mDialogueState.mKnownTopics, mFirstPersonCam);
+        convertPCDT(pcdt, mContext->mPlayer, mContext->mDialogueState.mKnownTopics, mFirstPersonCam, mTeleportingEnabled, mLevitationEnabled, mContext->mControlsState);
     }
     virtual void write(ESM::ESMWriter &esm)
     {
+        esm.startRecord(ESM::REC_ENAB);
+        esm.writeHNT("TELE", mTeleportingEnabled);
+        esm.writeHNT("LEVT", mLevitationEnabled);
+        esm.endRecord(ESM::REC_ENAB);
+
         esm.startRecord(ESM::REC_CAM_);
         esm.writeHNT("FIRS", mFirstPersonCam);
         esm.endRecord(ESM::REC_CAM_);
     }
 private:
     bool mFirstPersonCam;
+    bool mTeleportingEnabled;
+    bool mLevitationEnabled;
 };
 
 class ConvertCNTC : public Converter

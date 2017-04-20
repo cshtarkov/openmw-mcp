@@ -215,7 +215,9 @@ namespace MWBase
             virtual std::string getSelectedSpell() = 0;
             virtual void setSelectedSpell(const std::string& spellId, int successChancePercent) = 0;
             virtual void setSelectedEnchantItem(const MWWorld::Ptr& item) = 0;
+            virtual const MWWorld::Ptr& getSelectedEnchantItem() const = 0;
             virtual void setSelectedWeapon(const MWWorld::Ptr& item) = 0;
+            virtual const MWWorld::Ptr& getSelectedWeapon() const = 0;
             virtual void unsetSelectedSpell() = 0;
             virtual void unsetSelectedWeapon() = 0;
 
@@ -233,7 +235,7 @@ namespace MWBase
             virtual void removeDialog(MWGui::Layout* dialog) = 0;
 
             ///Gracefully attempts to exit the topmost GUI mode
-            /** No guarentee of actually closing the window **/
+            /** No guarantee of actually closing the window **/
             virtual void exitCurrentGuiMode() = 0;
 
             virtual void messageBox (const std::string& message, enum MWGui::ShowInDialogueMode showInDialogueMode = MWGui::ShowInDialogueMode_IfPossible) = 0;

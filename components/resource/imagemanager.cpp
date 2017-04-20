@@ -13,6 +13,9 @@ USE_OSGPLUGIN(png)
 USE_OSGPLUGIN(tga)
 USE_OSGPLUGIN(dds)
 USE_OSGPLUGIN(jpeg)
+USE_OSGPLUGIN(bmp)
+USE_OSGPLUGIN(osg)
+USE_SERIALIZER_WRAPPER_LIBRARY(osg)
 #endif
 
 namespace
@@ -136,6 +139,11 @@ namespace Resource
     osg::Image *ImageManager::getWarningImage()
     {
         return mWarningImage;
+    }
+
+    void ImageManager::reportStats(unsigned int frameNumber, osg::Stats *stats) const
+    {
+        stats->setAttribute(frameNumber, "Image", mCache->getCacheSize());
     }
 
 }

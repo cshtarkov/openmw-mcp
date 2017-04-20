@@ -8,9 +8,9 @@
 
 #include "../mwmechanics/stat.hpp"
 
-namespace osgViewer
+namespace osg
 {
-    class Viewer;
+    class Group;
 }
 
 namespace Resource
@@ -39,7 +39,7 @@ namespace MWGui
     public:
     typedef std::vector<int> SkillList;
 
-    CharacterCreation(osgViewer::Viewer* viewer, Resource::ResourceSystem* resourceSystem);
+    CharacterCreation(osg::Group* parent, Resource::ResourceSystem* resourceSystem);
     ~CharacterCreation();
 
     //Show a dialog
@@ -50,8 +50,10 @@ namespace MWGui
     void setValue(const ESM::Skill::SkillEnum parSkill, const MWMechanics::SkillValue& value);
     void configureSkills (const SkillList& major, const SkillList& minor);
 
+    void onFrame(float duration);
+
     private:
-    osgViewer::Viewer* mViewer;
+    osg::Group* mParent;
     Resource::ResourceSystem* mResourceSystem;
 
     //Dialogs

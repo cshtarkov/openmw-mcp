@@ -15,7 +15,9 @@
 #include "../widget/scenetooltoggle.hpp"
 #include "../widget/scenetooltoggle2.hpp"
 
+#include "cameracontroller.hpp"
 #include "mask.hpp"
+#include "tagbase.hpp"
 
 void CSVRender::UnpagedWorldspaceWidget::update()
 {
@@ -80,20 +82,22 @@ void CSVRender::UnpagedWorldspaceWidget::cellRowsAboutToBeRemoved (const QModelI
         emit closeRequest();
 }
 
-bool CSVRender::UnpagedWorldspaceWidget::handleDrop (const std::vector<CSMWorld::UniversalId>& data, DropType type)
+bool CSVRender::UnpagedWorldspaceWidget::handleDrop (const std::vector<CSMWorld::UniversalId>& universalIdData, DropType type)
 {
-    if (WorldspaceWidget::handleDrop (data, type))
+    if (WorldspaceWidget::handleDrop (universalIdData, type))
         return true;
 
     if (type!=Type_CellsInterior)
         return false;
 
-    mCellId = data.begin()->getId();
+    mCellId = universalIdData.begin()->getId();
 
     mCell.reset (new Cell (getDocument().getData(), mRootNode, mCellId));
+    mCamPositionSet = false;
+    mOrbitCamControl->reset();
 
     update();
-    emit cellChanged(*data.begin());
+    emit cellChanged(*universalIdData.begin());
 
     return true;
 }

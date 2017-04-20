@@ -10,6 +10,8 @@
 #include <osgViewer/CompositeViewer>
 #include <osgViewer/ViewerEventHandlers>
 #include <osg/LightModel>
+#include <osg/Material>
+#include <osg/Version>
 
 #include <components/resource/scenemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
@@ -73,6 +75,12 @@ RenderWidget::RenderWidget(QWidget *parent, Qt::WindowFlags f)
 
     mView->getCamera()->getOrCreateStateSet()->setMode(GL_NORMALIZE, osg::StateAttribute::ON);
     mView->getCamera()->getOrCreateStateSet()->setMode(GL_CULL_FACE, osg::StateAttribute::ON);
+    osg::ref_ptr<osg::Material> defaultMat (new osg::Material);
+    defaultMat->setColorMode(osg::Material::OFF);
+    defaultMat->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4f(1,1,1,1));
+    defaultMat->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4f(1,1,1,1));
+    defaultMat->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4f(0.f, 0.f, 0.f, 0.f));
+    mView->getCamera()->getOrCreateStateSet()->setAttribute(defaultMat);
 
     mView->setSceneData(mRootNode);
 
@@ -129,6 +137,10 @@ CompositeViewer::CompositeViewer()
 #endif
 
     setThreadingModel(threadingModel);
+
+#if OSG_VERSION_GREATER_OR_EQUAL(3,5,5)
+    setUseConfigureAffinity(false);
+#endif
 
     // disable the default setting of viewer.done() by pressing Escape.
     setKeyEventSetsDone(0);
@@ -209,7 +221,7 @@ SceneWidget::SceneWidget(boost::shared_ptr<Resource::ResourceSystem> resourceSys
 
 SceneWidget::~SceneWidget()
 {
-    // Since we're holding on to the scene templates past the existance of this graphics context, we'll need to manually release the created objects
+    // Since we're holding on to the scene templates past the existence of this graphics context, we'll need to manually release the created objects
     mResourceSystem->getSceneManager()->releaseGLObjects(mView->getCamera()->getGraphicsContext()->getState());
 }
 

@@ -16,11 +16,7 @@ namespace osg
 {
     class Texture2D;
     class Camera;
-}
-
-namespace osgViewer
-{
-    class Viewer;
+    class Group;
 }
 
 namespace MWRender
@@ -32,7 +28,7 @@ namespace MWRender
     class CharacterPreview
     {
     public:
-        CharacterPreview(osgViewer::Viewer* viewer, Resource::ResourceSystem* resourceSystem, MWWorld::Ptr character, int sizeX, int sizeY,
+        CharacterPreview(osg::Group* parent, Resource::ResourceSystem* resourceSystem, MWWorld::Ptr character, int sizeX, int sizeY,
                          const osg::Vec3f& position, const osg::Vec3f& lookAt);
         virtual ~CharacterPreview();
 
@@ -51,9 +47,10 @@ namespace MWRender
 
     protected:
         virtual bool renderHeadOnly() { return false; }
+        void setBlendMode();
         virtual void onSetup();
 
-        osg::ref_ptr<osgViewer::Viewer> mViewer;
+        osg::ref_ptr<osg::Group> mParent;
         Resource::ResourceSystem* mResourceSystem;
         osg::ref_ptr<osg::Texture2D> mTexture;
         osg::ref_ptr<osg::Camera> mCamera;
@@ -64,7 +61,7 @@ namespace MWRender
 
         MWWorld::Ptr mCharacter;
 
-        std::auto_ptr<MWRender::NpcAnimation> mAnimation;
+        osg::ref_ptr<MWRender::NpcAnimation> mAnimation;
         osg::ref_ptr<osg::PositionAttitudeTransform> mNode;
         std::string mCurrentAnimGroup;
 
@@ -76,7 +73,7 @@ namespace MWRender
     {
     public:
 
-        InventoryPreview(osgViewer::Viewer* viewer, Resource::ResourceSystem* resourceSystem, MWWorld::Ptr character);
+        InventoryPreview(osg::Group* parent, Resource::ResourceSystem* resourceSystem, MWWorld::Ptr character);
 
         void updatePtr(const MWWorld::Ptr& ptr);
 
@@ -102,7 +99,7 @@ namespace MWRender
         virtual void onSetup();
 
     public:
-        RaceSelectionPreview(osgViewer::Viewer* viewer, Resource::ResourceSystem* resourceSystem);
+        RaceSelectionPreview(osg::Group* parent, Resource::ResourceSystem* resourceSystem);
         virtual ~RaceSelectionPreview();
 
         void setAngle(float angleRadians);

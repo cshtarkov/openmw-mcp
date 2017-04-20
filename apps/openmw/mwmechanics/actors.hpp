@@ -88,7 +88,7 @@ namespace MWMechanics
                 @Notes: If againstPlayer = true then actor2 should be the Player.
                         If one of the combatants is creature it should be actor1.
             */
-            void engageCombat(const MWWorld::Ptr& actor1, const MWWorld::Ptr& actor2, bool againstPlayer);
+            void engageCombat(const MWWorld::Ptr& actor1, const MWWorld::Ptr& actor2, std::map<const MWWorld::Ptr, const std::set<MWWorld::Ptr> >& cachedAllies, bool againstPlayer);
 
             void updateHeadTracking(const MWWorld::Ptr& actor, const MWWorld::Ptr& targetActor,
                                             MWWorld::Ptr& headTrackTarget, float& sqrHeadTrackDistance);
@@ -122,6 +122,13 @@ namespace MWMechanics
             /**ie AiFollow or AiEscort is active and the target is the actor **/
             std::list<MWWorld::Ptr> getActorsSidingWith(const MWWorld::Ptr& actor);
             std::list<MWWorld::Ptr> getActorsFollowing(const MWWorld::Ptr& actor);
+
+            /// Recursive version of getActorsFollowing
+            void getActorsFollowing(const MWWorld::Ptr &actor, std::set<MWWorld::Ptr>& out);
+            /// Recursive version of getActorsSidingWith
+            void getActorsSidingWith(const MWWorld::Ptr &actor, std::set<MWWorld::Ptr>& out);
+            /// Recursive version of getActorsSidingWith that takes, adds to and returns a cache of actors mapped to their allies
+            void getActorsSidingWith(const MWWorld::Ptr &actor, std::set<MWWorld::Ptr>& out, std::map<const MWWorld::Ptr, const std::set<MWWorld::Ptr> >& cachedAllies);
 
             /// Get the list of AiFollow::mFollowIndex for all actors following this target
             std::list<int> getActorsFollowingIndices(const MWWorld::Ptr& actor);

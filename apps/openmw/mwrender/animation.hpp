@@ -25,6 +25,7 @@ namespace NifOsg
 namespace SceneUtil
 {
     class LightSource;
+    class LightListCallback;
     class Skeleton;
 }
 
@@ -57,9 +58,6 @@ public:
 
     ~PartHolder();
 
-    /// Unreferences mNode *without* detaching it from the graph. Only use if you know what you are doing.
-    void unlink();
-
     osg::ref_ptr<osg::Node> getNode()
     {
         return mNode;
@@ -73,7 +71,7 @@ private:
 };
 typedef boost::shared_ptr<PartHolder> PartHolderPtr;
 
-class Animation
+class Animation : public osg::Referenced
 {
 public:
     enum BoneGroup {
@@ -183,6 +181,7 @@ protected:
         float mSpeedMult;
 
         bool mPlaying;
+        bool mLoopingEnabled;
         size_t mLoopCount;
 
         AnimPriority mPriority;
@@ -190,8 +189,8 @@ protected:
         bool mAutoDisable;
 
         AnimState() : mStartTime(0.0f), mLoopStartTime(0.0f), mLoopStopTime(0.0f), mStopTime(0.0f),
-                      mTime(new float), mSpeedMult(1.0f), mPlaying(false), mLoopCount(0),
-                      mPriority(0), mBlendMask(0), mAutoDisable(true)
+                      mTime(new float), mSpeedMult(1.0f), mPlaying(false), mLoopingEnabled(true),
+                      mLoopCount(0), mPriority(0), mBlendMask(0), mAutoDisable(true)
         {
         }
         ~AnimState();
@@ -203,6 +202,11 @@ protected:
         void setTime(float time)
         {
             *mTime = time;
+        }
+
+        bool shouldLoop() const
+        {
+            return getTime() >= mLoopStopTime && mLoopingEnabled && mLoopCount > 0;
         }
     };
     typedef std::map<std::string,AnimState> AnimStateMap;
@@ -267,6 +271,10 @@ protected:
 
     float mAlpha;
 
+    mutable std::map<std::string, float> mAnimVelocities;
+
+    osg::ref_ptr<SceneUtil::LightListCallback> mLightListCallback;
+
     const NodeMap& getNodeMap() const;
 
     /* Sets the appropriate animations on the bone groups based on priority.
@@ -293,7 +301,7 @@ protected:
 
     /** Sets the root model of the object.
      *
-     * Note that you must make sure all animation sources are cleared before reseting the object
+     * Note that you must make sure all animation sources are cleared before resetting the object
      * root. All nodes previously retrieved with getNode will also become invalidated.
      * @param forceskeleton Wrap the object root in a Skeleton, even if it contains no skinned parts. Use this if you intend to add skinned parts manually.
      * @param baseonly If true, then any meshes or particle systems in the model are ignored
@@ -328,9 +336,13 @@ protected:
 public:
 
     Animation(const MWWorld::Ptr &ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
+
+    /// Must be thread safe
     virtual ~Animation();
 
     MWWorld::ConstPtr getPtr() const;
+
+    MWWorld::Ptr getPtr();
 
     /// Set active flag on the object skeleton, if one exists.
     /// @see SceneUtil::Skeleton::setActive
@@ -354,7 +366,9 @@ public:
     void removeEffect (int effectId);
     void getLoopingEffects (std::vector<int>& out) const;
 
-    void addSpellCastGlow(const ESM::MagicEffect *effect);
+    // Add a spell casting glow to an object. From measuring video taken from the original engine,
+    // the glow seems to be about 1.5 seconds except for telekinesis, which is 1 second.
+    void addSpellCastGlow(const ESM::MagicEffect *effect, float glowDuration = 1.5);
 
     virtual void updatePtr(const MWWorld::Ptr &ptr);
 
@@ -388,10 +402,6 @@ public:
     void play(const std::string &groupname, const AnimPriority& priority, int blendMask, bool autodisable,
               float speedmult, const std::string &start, const std::string &stop,
               float startpoint, size_t loops, bool loopfallback=false);
-
-    /** If the given animation group is currently playing, set its remaining loop count to '0'.
-     */
-    void stopLooping(const std::string& groupName);
 
     /** Adjust the speed multiplier of an already playing animation.
      */
@@ -431,6 +441,8 @@ public:
     float getVelocity(const std::string &groupname) const;
 
     virtual osg::Vec3f runAnimation(float duration);
+
+    void setLoopingEnabled(const std::string &groupname, bool enabled);
 
     /// This is typically called as part of runAnimation, but may be called manually if needed.
     void updateEffects(float duration);

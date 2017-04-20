@@ -75,8 +75,11 @@ namespace MWClass
                 MWBase::Environment::get().getWorld()->activateDoor(ptr, customData.mDoorState);
             }
         }
+    }
 
-        MWBase::Environment::get().getMechanicsManager()->add(ptr);
+    bool Door::useAnim() const
+    {
+        return true;
     }
 
     std::string Door::getModel(const MWWorld::ConstPtr &ptr) const
@@ -107,7 +110,7 @@ namespace MWClass
         const std::string lockedSound = "LockedDoor";
         const std::string trapActivationSound = "Disarm Trap Fail";
 
-        MWWorld::ContainerStore &invStore = actor.getClass().getContainerStore(actor);
+        const MWWorld::ContainerStore &invStore = actor.getClass().getContainerStore(actor);
 
         bool isLocked = ptr.getCellRef().getLockLevel() > 0;
         bool isTrapped = !ptr.getCellRef().getTrap().empty();
@@ -125,13 +128,13 @@ namespace MWClass
             int index = ESM::MagicEffect::effectStringToId("sEffectTelekinesis");
             const ESM::MagicEffect *effect = store.get<ESM::MagicEffect>().find(index);
 
-            animation->addSpellCastGlow(effect); // TODO: Telekinesis glow should only be as long as the door animation
+            animation->addSpellCastGlow(effect, 1); // 1 second glow to match the time taken for a door opening or closing
         }
 
         // make key id lowercase
         std::string keyId = ptr.getCellRef().getKey();
         Misc::StringUtils::lowerCaseInPlace(keyId);
-        for (MWWorld::ContainerStoreIterator it = invStore.begin(); it != invStore.end(); ++it)
+        for (MWWorld::ConstContainerStoreIterator it = invStore.cbegin(); it != invStore.cend(); ++it)
         {
             std::string refId = it->getCellRef().getRefId();
             Misc::StringUtils::lowerCaseInPlace(refId);
@@ -232,7 +235,7 @@ namespace MWClass
         if(lockLevel!=0)
             ptr.getCellRef().setLockLevel(abs(lockLevel)); //Changes lock to locklevel, in positive
         else
-            ptr.getCellRef().setLockLevel(abs(ptr.getCellRef().getLockLevel())); //No locklevel given, just flip the origional one
+            ptr.getCellRef().setLockLevel(abs(ptr.getCellRef().getLockLevel())); //No locklevel given, just flip the original one
     }
 
     void Door::unlock (const MWWorld::Ptr& ptr) const

@@ -413,7 +413,10 @@ namespace MWGui
         int TextElement::currentFontHeight() const
         {
             std::string fontName(mTextStyle.mFont == "Default" ? MyGUI::FontManager::getInstance().getDefaultFont() : mTextStyle.mFont);
-            return MyGUI::FontManager::getInstance().getByName(fontName)->getDefaultHeight();
+            MyGUI::IFont* font = MyGUI::FontManager::getInstance().getByName(fontName);
+            if (!font)
+                return 0;
+            return font->getDefaultHeight();
         }
 
         int TextElement::getHeight()
@@ -425,7 +428,9 @@ namespace MWGui
         {
             // split lines
             const int lineHeight = currentFontHeight();
-            unsigned int lastLine = (mPaginator.getStartTop() + mPaginator.getPageHeight() - mPaginator.getCurrentTop()) / lineHeight;
+            unsigned int lastLine = (mPaginator.getStartTop() + mPaginator.getPageHeight() - mPaginator.getCurrentTop());
+            if (lineHeight > 0)
+                lastLine /= lineHeight;
             int ret = mPaginator.getCurrentTop() + lastLine * lineHeight;
 
             // first empty lines that would go to the next page should be ignored

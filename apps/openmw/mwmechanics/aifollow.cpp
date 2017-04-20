@@ -47,14 +47,14 @@ AiFollow::AiFollow(const std::string &actorId, bool commanded)
 }
 
 AiFollow::AiFollow(const ESM::AiSequence::AiFollow *follow)
-    : mCommanded(follow->mCommanded), mRemainingDuration(follow->mRemainingDuration)
+    : mAlwaysFollow(follow->mAlwaysFollow), mCommanded(follow->mCommanded), mRemainingDuration(follow->mRemainingDuration)
     , mX(follow->mData.mX), mY(follow->mData.mY), mZ(follow->mData.mZ)
     , mActorRefId(follow->mTargetId), mActorId(-1)
     , mCellId(follow->mCellId), mActive(follow->mActive), mFollowIndex(mFollowIndexCounter++)
 {
-// mDuration isn't saved in the save file, so just giving it "1" for now if the package has a duration.
-// The exact value of mDuration only matters for repeating packages
-    if (mRemainingDuration != 0)
+// mDuration isn't saved in the save file, so just giving it "1" for now if the package had a duration.
+// The exact value of mDuration only matters for repeating packages.
+    if (mRemainingDuration > 0) // Previously mRemainingDuration could be negative even when mDuration was 0. Checking for > 0 should fix old saves.
        mDuration = 1;
     else
        mDuration = 0;
@@ -92,22 +92,29 @@ bool AiFollow::execute (const MWWorld::Ptr& actor, CharacterController& characte
 
     ESM::Position pos = actor.getRefData().getPosition(); //position of the actor
 
-    float followDistance = 180;
-    // When there are multiple actors following the same target, they form a group with each group member at 180*(i+1) distance to the target
-    int i=0;
+    // The distances below are approximations based on observations of the original engine.
+    // If only one actor is following the target, it uses 186.
+    // If there are multiple actors following the same target, they form a group with each group member at 313 + (130 * i) distance to the target.
+
+    short followDistance = 186;
     std::list<int> followers = MWBase::Environment::get().getMechanicsManager()->getActorsFollowingIndices(target);
-    followers.sort();
-    for (std::list<int>::iterator it = followers.begin(); it != followers.end(); ++it)
+    if (followers.size() >= 2)
     {
-        if (*it == mFollowIndex)
-            followDistance *= (i+1);
-        ++i;
+        followDistance = 313;
+        short i = 0;
+        followers.sort();
+        for (std::list<int>::iterator it = followers.begin(); it != followers.end(); ++it)
+        {
+            if (*it == mFollowIndex)
+                followDistance += 130 * i;
+            ++i;
+        }
     }
 
-    if(!mAlwaysFollow) //Update if you only follow for a bit
+    if (!mAlwaysFollow) //Update if you only follow for a bit
     {
          //Check if we've run out of time
-        if (mDuration != 0)
+        if (mDuration > 0)
         {
             mRemainingDuration -= ((duration*MWBase::Environment::get().getWorld()->getTimeScaleFactor()) / 3600);
             if (mRemainingDuration <= 0)
@@ -117,18 +124,18 @@ bool AiFollow::execute (const MWWorld::Ptr& actor, CharacterController& characte
             }
         }
 
-        if((pos.pos[0]-mX)*(pos.pos[0]-mX) +
+        if ((pos.pos[0]-mX)*(pos.pos[0]-mX) +
             (pos.pos[1]-mY)*(pos.pos[1]-mY) +
             (pos.pos[2]-mZ)*(pos.pos[2]-mZ) < followDistance*followDistance) //Close-ish to final position
         {
-            if(actor.getCell()->isExterior()) //Outside?
+            if (actor.getCell()->isExterior()) //Outside?
             {
-                if(mCellId == "") //No cell to travel to
+                if (mCellId == "") //No cell to travel to
                     return true;
             }
             else
             {
-                if(mCellId == actor.getCell()->getCell()->mName) //Cell to travel to
+                if (mCellId == actor.getCell()->getCell()->mName) //Cell to travel to
                     return true;
             }
         }
@@ -139,7 +146,7 @@ bool AiFollow::execute (const MWWorld::Ptr& actor, CharacterController& characte
 
     if (!storage.mMoving) 
     {
-        const float threshold = 10; // to avoid constant switching between moving/stopping
+        const short threshold = 10; // to avoid constant switching between moving/stopping
         followDistance += threshold;
     }
 
@@ -152,7 +159,7 @@ bool AiFollow::execute (const MWWorld::Ptr& actor, CharacterController& characte
 
         if (dist > 450)
             actor.getClass().getCreatureStats(actor).setMovementFlag(MWMechanics::CreatureStats::Flag_Run, true); //Make NPC run
-        else if (dist < 325) //Have a bit of a dead zone, otherwise npc will constantly flip between running and not when right on the edge of the running threshhold
+        else if (dist < 325) //Have a bit of a dead zone, otherwise npc will constantly flip between running and not when right on the edge of the running threshold
             actor.getClass().getCreatureStats(actor).setMovementFlag(MWMechanics::CreatureStats::Flag_Run, false); //make NPC walk
     }
 
@@ -228,8 +235,9 @@ int AiFollow::getFollowIndex() const
 
 void AiFollow::fastForward(const MWWorld::Ptr& actor, AiState &state)
 {
-    // Update duration counter
-    mRemainingDuration--;
+    // Update duration counter if this package has a duration
+    if (mDuration > 0)
+        mRemainingDuration--;
 }
 
 }

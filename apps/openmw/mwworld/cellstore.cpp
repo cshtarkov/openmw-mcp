@@ -137,6 +137,9 @@ namespace
                     iter->load (state);
                     return;
                 }
+
+            std::cerr << "Warning: Dropping reference to " << state.mRef.mRefID << " (invalid content file link)" << std::endl;
+            return;
         }
 
         // new reference
@@ -194,7 +197,7 @@ namespace MWWorld
         else
         {
             std::cerr
-                << "Error: could not resolve cell reference '" << ref.mRefID << "'"
+                << "Warning: could not resolve cell reference '" << ref.mRefID << "'"
                 << " (dropping reference)" << std::endl;
         }
     }
@@ -202,6 +205,14 @@ namespace MWWorld
     template<typename X> bool operator==(const LiveCellRef<X>& ref, int pRefnum)
     {
         return (ref.mRef.mRefnum == pRefnum);
+    }
+
+    Ptr CellStore::getCurrentPtr(LiveCellRefBase *ref)
+    {
+        MovedRefTracker::iterator found = mMovedToAnotherCell.find(ref);
+        if (found != mMovedToAnotherCell.end())
+            return Ptr(ref, found->second);
+        return Ptr(ref, this);
     }
 
     void CellStore::moveFrom(const Ptr &object, CellStore *from)
@@ -656,7 +667,7 @@ namespace MWWorld
 
             default:
                 std::cerr
-                    << "WARNING: Ignoring reference '" << ref.mRefID << "' of unhandled type\n";
+                    << "Error: Ignoring reference '" << ref.mRefID << "' of unhandled type\n";
                 return;
         }
 
@@ -887,7 +898,7 @@ namespace MWWorld
 
             if (!visitor.mFound)
             {
-                std::cerr << "Dropping moved ref tag for " << refnum.mIndex << " (moved object no longer exists)" << std::endl;
+                std::cerr << "Warning: Dropping moved ref tag for " << refnum.mIndex << " (moved object no longer exists)" << std::endl;
                 continue;
             }
 
@@ -897,7 +908,7 @@ namespace MWWorld
 
             if (otherCell == NULL)
             {
-                std::cerr << "Dropping moved ref tag for " << movedRef->mRef.getRefId()
+                std::cerr << "Warning: Dropping moved ref tag for " << movedRef->mRef.getRefId()
                           << " (target cell " << movedTo.mWorldspace << " no longer exists). Reference moved back to its original location." << std::endl;
                 // Note by dropping tag the object will automatically re-appear in its original cell, though potentially at inapproriate coordinates.
                 // Restore original coordinates:
@@ -964,26 +975,26 @@ namespace MWWorld
                 mLastRespawn = MWBase::Environment::get().getWorld()->getTimeStamp();
                 for (CellRefList<ESM::Container>::List::iterator it (mContainers.mList.begin()); it!=mContainers.mList.end(); ++it)
                 {
-                    Ptr ptr (&*it, this);
+                    Ptr ptr = getCurrentPtr(&*it);
                     ptr.getClass().respawn(ptr);
                 }
             }
 
             for (CellRefList<ESM::Creature>::List::iterator it (mCreatures.mList.begin()); it!=mCreatures.mList.end(); ++it)
             {
-                Ptr ptr (&*it, this);
+                Ptr ptr = getCurrentPtr(&*it);
                 clearCorpse(ptr);
                 ptr.getClass().respawn(ptr);
             }
             for (CellRefList<ESM::NPC>::List::iterator it (mNpcs.mList.begin()); it!=mNpcs.mList.end(); ++it)
             {
-                Ptr ptr (&*it, this);
+                Ptr ptr = getCurrentPtr(&*it);
                 clearCorpse(ptr);
                 ptr.getClass().respawn(ptr);
             }
             for (CellRefList<ESM::CreatureLevList>::List::iterator it (mCreatureLists.mList.begin()); it!=mCreatureLists.mList.end(); ++it)
             {
-                Ptr ptr (&*it, this);
+                Ptr ptr = getCurrentPtr(&*it);
                 // no need to clearCorpse, handled as part of mCreatures
                 ptr.getClass().respawn(ptr);
             }

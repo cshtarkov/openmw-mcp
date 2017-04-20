@@ -95,8 +95,6 @@ namespace MWBase
 
             virtual ~World() {}
 
-            virtual void preloadCommonAssets() = 0;
-
             virtual void startNewGame (bool bypass) = 0;
             ///< \param bypass Bypass regular game start.
 
@@ -217,7 +215,7 @@ namespace MWBase
             virtual bool toggleSky() = 0;
             ///< \return Resulting mode
 
-            virtual void changeWeather(const std::string& region, unsigned int id) = 0;
+            virtual void changeWeather(const std::string& region, const unsigned int id) = 0;
 
             virtual int getCurrentWeather() const = 0;
 
@@ -257,7 +255,7 @@ namespace MWBase
             /// Returns a pointer to the object the provided object would hit (if within the
             /// specified distance), and the point where the hit occurs. This will attempt to
             /// use the "Head" node, or alternatively the "Bip01 Head" node as a basis.
-            virtual std::pair<MWWorld::Ptr,osg::Vec3f> getHitContact(const MWWorld::ConstPtr &ptr, float distance) = 0;
+            virtual std::pair<MWWorld::Ptr,osg::Vec3f> getHitContact(const MWWorld::ConstPtr &ptr, float distance, std::vector<MWWorld::Ptr> &targets) = 0;
 
             virtual void adjustPosition (const MWWorld::Ptr& ptr, bool force) = 0;
             ///< Adjust position after load to be on ground. Must be called after model load.
@@ -385,6 +383,7 @@ namespace MWBase
             ///Is the head of the creature underwater?
             virtual bool isSubmerged(const MWWorld::ConstPtr &object) const = 0;
             virtual bool isUnderwater(const MWWorld::CellStore* cell, const osg::Vec3f &pos) const = 0;
+            virtual bool isWaterWalkingCastableOnTarget(const MWWorld::ConstPtr &target) const = 0;
             virtual bool isOnGround(const MWWorld::Ptr &ptr) const = 0;
 
             virtual osg::Matrixf getActorHeadTransform(const MWWorld::ConstPtr& actor) const = 0;
@@ -485,9 +484,8 @@ namespace MWBase
 
             virtual void castSpell (const MWWorld::Ptr& actor) = 0;
 
-            virtual void launchMagicBolt (const std::string& model, const std::string& sound, const std::string& spellId,
-                                          float speed, bool stack, const ESM::EffectList& effects,
-                                           const MWWorld::Ptr& caster, const std::string& sourceName, const osg::Vec3f& fallbackDirection) = 0;
+            virtual void launchMagicBolt (const std::string& spellId, bool stack, const ESM::EffectList& effects,
+                                          const MWWorld::Ptr& caster, const std::string& sourceName, const osg::Vec3f& fallbackDirection) = 0;
             virtual void launchProjectile (MWWorld::Ptr actor, MWWorld::ConstPtr projectile,
                                            const osg::Vec3f& worldPos, const osg::Quat& orient, MWWorld::Ptr bow, float speed, float attackStrength) = 0;
 
@@ -534,8 +532,9 @@ namespace MWBase
 
             virtual void spawnEffect (const std::string& model, const std::string& textureOverride, const osg::Vec3f& worldPos) = 0;
 
-            virtual void explodeSpell (const osg::Vec3f& origin, const ESM::EffectList& effects, const MWWorld::Ptr& caster,
-                                       const MWWorld::Ptr& ignore, ESM::RangeType rangeType, const std::string& id, const std::string& sourceName) = 0;
+            virtual void explodeSpell(const osg::Vec3f& origin, const ESM::EffectList& effects, const MWWorld::Ptr& caster,
+                                      const MWWorld::Ptr& ignore, ESM::RangeType rangeType, const std::string& id,
+                                      const std::string& sourceName, const bool fromProjectile=false) = 0;
 
             virtual void activate (const MWWorld::Ptr& object, const MWWorld::Ptr& actor) = 0;
 
@@ -548,7 +547,7 @@ namespace MWBase
             /// Resets all actors in the current active cells to their original location within that cell.
             virtual void resetActors() = 0;
 
-            virtual bool isWalkingOnWater (const MWWorld::ConstPtr& actor) = 0;
+            virtual bool isWalkingOnWater (const MWWorld::ConstPtr& actor) const = 0;
 
             /// Return a vector aiming the actor's weapon towards a target.
             /// @note The length of the vector is the distance between actor and target.
@@ -560,6 +559,19 @@ namespace MWBase
             virtual void removeContainerScripts(const MWWorld::Ptr& reference) = 0;
 
             virtual bool isPlayerInJail() const = 0;
+
+            /// Return terrain height at \a worldPos position.
+            virtual float getTerrainHeightAt(const osg::Vec3f& worldPos) const = 0;
+
+            /// Return physical or rendering half extents of the given actor.
+            virtual osg::Vec3f getHalfExtents(const MWWorld::ConstPtr& actor, bool rendering=false) const = 0;
+
+            /// Export scene graph to a file and return the filename.
+            /// \param ptr object to export scene graph for (if empty, export entire scene graph)
+            virtual std::string exportSceneGraph(const MWWorld::Ptr& ptr) = 0;
+
+            /// Preload VFX associated with this effect list
+            virtual void preloadEffects(const ESM::EffectList* effectList) = 0;
     };
 }
 

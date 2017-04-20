@@ -120,12 +120,16 @@ void RigGeometry::setSourceGeometry(osg::ref_ptr<osg::Geometry> sourceGeometry)
         setVertexArray(vertexArray);
     }
 
-    osg::ref_ptr<osg::Array> normalArray = osg::clone(from.getNormalArray(), osg::CopyOp::DEEP_COPY_ALL);
-    if (normalArray)
+    if (osg::Array* normals = from.getNormalArray())
     {
-        normalArray->setVertexBufferObject(vbo);
-        setNormalArray(normalArray, osg::Array::BIND_PER_VERTEX);
+        osg::ref_ptr<osg::Array> normalArray = osg::clone(normals, osg::CopyOp::DEEP_COPY_ALL);
+        if (normalArray)
+        {
+            normalArray->setVertexBufferObject(vbo);
+            setNormalArray(normalArray, osg::Array::BIND_PER_VERTEX);
+        }
     }
+
 
     if (osg::Vec4Array* tangents = dynamic_cast<osg::Vec4Array*>(from.getTexCoordArray(7)))
     {
@@ -158,13 +162,13 @@ bool RigGeometry::initFromParentSkeleton(osg::NodeVisitor* nv)
 
     if (!mSkeleton)
     {
-        std::cerr << "A RigGeometry did not find its parent skeleton" << std::endl;
+        std::cerr << "Error: A RigGeometry did not find its parent skeleton" << std::endl;
         return false;
     }
 
     if (!mInfluenceMap)
     {
-        std::cerr << "No InfluenceMap set on RigGeometry" << std::endl;
+        std::cerr << "Error: No InfluenceMap set on RigGeometry" << std::endl;
         return false;
     }
 
@@ -175,7 +179,7 @@ bool RigGeometry::initFromParentSkeleton(osg::NodeVisitor* nv)
         Bone* bone = mSkeleton->getBone(it->first);
         if (!bone)
         {
-            std::cerr << "RigGeometry did not find bone " << it->first << std::endl;
+            std::cerr << "Error: RigGeometry did not find bone " << it->first << std::endl;
             continue;
         }
 
@@ -228,7 +232,7 @@ void RigGeometry::update(osg::NodeVisitor* nv)
 {
     if (!mSkeleton)
     {
-        std::cerr << "RigGeometry rendering with no skeleton, should have been initialized by UpdateVisitor" << std::endl;
+        std::cerr << "Error: RigGeometry rendering with no skeleton, should have been initialized by UpdateVisitor" << std::endl;
         // try to recover anyway, though rendering is likely to be incorrect.
         if (!initFromParentSkeleton(nv))
             return;
@@ -267,13 +271,15 @@ void RigGeometry::update(osg::NodeVisitor* nv)
             const osg::Matrixf& boneMatrix = bone->mMatrixInSkeletonSpace;
             accumulateMatrix(invBindMatrix, boneMatrix, weight, resultMat);
         }
-        resultMat = resultMat * mGeomToSkelMatrix;
+        if (mGeomToSkelMatrix)
+            resultMat *= (*mGeomToSkelMatrix);
 
         for (std::vector<unsigned short>::const_iterator vertexIt = it->second.begin(); vertexIt != it->second.end(); ++vertexIt)
         {
             unsigned short vertex = *vertexIt;
             (*positionDst)[vertex] = resultMat.preMult((*positionSrc)[vertex]);
-            (*normalDst)[vertex] = osg::Matrix::transform3x3((*normalSrc)[vertex], resultMat);
+            if (normalDst)
+                (*normalDst)[vertex] = osg::Matrix::transform3x3((*normalSrc)[vertex], resultMat);
             if (tangentDst)
             {
                 osg::Vec4f srcTangent = (*tangentSrc)[vertex];
@@ -284,7 +290,8 @@ void RigGeometry::update(osg::NodeVisitor* nv)
     }
 
     positionDst->dirty();
-    normalDst->dirty();
+    if (normalDst)
+        normalDst->dirty();
     if (tangentDst)
         tangentDst->dirty();
 }
@@ -310,32 +317,47 @@ void RigGeometry::updateBounds(osg::NodeVisitor *nv)
     {
         Bone* bone = it->first;
         osg::BoundingSpheref bs = it->second;
-        transformBoundingSphere(bone->mMatrixInSkeletonSpace * mGeomToSkelMatrix, bs);
+        if (mGeomToSkelMatrix)
+            transformBoundingSphere(bone->mMatrixInSkeletonSpace * (*mGeomToSkelMatrix), bs);
+        else
+            transformBoundingSphere(bone->mMatrixInSkeletonSpace, bs);
         box.expandBy(bs);
     }
 
-    _boundingBox = box;
-    _boundingSphere = osg::BoundingSphere(_boundingBox);
-    _boundingSphereComputed = true;
-    for (unsigned int i=0; i<getNumParents(); ++i)
-        getParent(i)->dirtyBound();
+    if (box != _boundingBox)
+    {
+        _boundingBox = box;
+        _boundingSphere = osg::BoundingSphere(_boundingBox);
+        _boundingSphereComputed = true;
+        for (unsigned int i=0; i<getNumParents(); ++i)
+            getParent(i)->dirtyBound();
+    }
 }
 
 void RigGeometry::updateGeomToSkelMatrix(const osg::NodePath& nodePath)
 {
-    mSkelToGeomPath.clear();
     bool foundSkel = false;
+    osg::ref_ptr<osg::RefMatrix> geomToSkelMatrix;
     for (osg::NodePath::const_iterator it = nodePath.begin(); it != nodePath.end(); ++it)
     {
+        osg::Node* node = *it;
         if (!foundSkel)
         {
-            if (*it == mSkeleton)
+            if (node == mSkeleton)
                 foundSkel = true;
         }
         else
-            mSkelToGeomPath.push_back(*it);
+        {
+            if (osg::Transform* trans = node->asTransform())
+            {
+                if (!geomToSkelMatrix)
+                    geomToSkelMatrix = new osg::RefMatrix;
+                trans->computeWorldToLocalMatrix(*geomToSkelMatrix, NULL);
+            }
+        }
     }
-    mGeomToSkelMatrix = osg::computeWorldToLocal(mSkelToGeomPath);
+    if (geomToSkelMatrix && !geomToSkelMatrix->isIdentity())
+        mGeomToSkelMatrix = geomToSkelMatrix;
 }
 
 void RigGeometry::setInfluenceMap(osg::ref_ptr<InfluenceMap> influenceMap)

@@ -127,8 +127,6 @@ void Skeleton::updateBoneMatrices(unsigned int traversalNumber)
             for (unsigned int i=0; i<mRootBone->mChildren.size(); ++i)
                 mRootBone->mChildren[i]->update(NULL);
         }
-        else
-            std::cerr << "no root bone" << std::endl;
 
         mNeedToUpdateBoneMatrices = false;
     }
@@ -148,6 +146,8 @@ void Skeleton::markDirty()
 {
     mTraversedEvenFrame = false;
     mTraversedOddFrame = false;
+    mBoneCache.clear();
+    mBoneCacheInit = false;
 }
 
 void Skeleton::traverse(osg::NodeVisitor& nv)
@@ -158,6 +158,16 @@ void Skeleton::traverse(osg::NodeVisitor& nv)
             && mLastFrameNumber != 0 && mTraversedEvenFrame && mTraversedOddFrame)
         return;
     osg::Group::traverse(nv);
+}
+
+void Skeleton::childInserted(unsigned int)
+{
+    markDirty();
+}
+
+void Skeleton::childRemoved(unsigned int, unsigned int)
+{
+    markDirty();
 }
 
 Bone::Bone()
@@ -176,7 +186,7 @@ void Bone::update(const osg::Matrixf* parentMatrixInSkeletonSpace)
 {
     if (!mNode)
     {
-        std::cerr << "Bone without node " << std::endl;
+        std::cerr << "Error: Bone without node " << std::endl;
         return;
     }
     if (parentMatrixInSkeletonSpace)

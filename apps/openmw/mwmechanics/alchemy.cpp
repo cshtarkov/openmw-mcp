@@ -73,7 +73,7 @@ void MWMechanics::Alchemy::applyTools (int flags, float& value) const
     bool duration = !(flags & ESM::MagicEffect::NoDuration);
     bool negative = (flags & ESM::MagicEffect::Harmful) != 0;
 
-    int tool = negative ? ESM::Apparatus::Retort : ESM::Apparatus::Albemic;
+    int tool = negative ? ESM::Apparatus::Alembic : ESM::Apparatus::Retort;
 
     int setup = 0;
 
@@ -171,10 +171,10 @@ void MWMechanics::Alchemy::updateEffects()
         if (fPotionT1DurMult<=0)
             throw std::runtime_error ("invalid gmst: fPotionT1DurMult");
 
-        float magnitude = magicEffect->mData.mFlags & ESM::MagicEffect::NoMagnitude ?
-            1 : (x / fPotionT1MagMul) / magicEffect->mData.mBaseCost;
-        float duration = magicEffect->mData.mFlags & ESM::MagicEffect::NoDuration ?
-            1 : (x / fPotionT1DurMult) / magicEffect->mData.mBaseCost;
+        float magnitude = (magicEffect->mData.mFlags & ESM::MagicEffect::NoMagnitude) ?
+            1.0f : (x / fPotionT1MagMul) / magicEffect->mData.mBaseCost;
+        float duration = (magicEffect->mData.mFlags & ESM::MagicEffect::NoDuration) ?
+            1.0f : (x / fPotionT1DurMult) / magicEffect->mData.mBaseCost;
 
         if (!(magicEffect->mData.mFlags & ESM::MagicEffect::NoMagnitude))
             applyTools (magicEffect->mData.mFlags, magnitude);

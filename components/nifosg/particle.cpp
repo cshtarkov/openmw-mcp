@@ -3,6 +3,7 @@
 #include <limits>
 
 #include <osg/MatrixTransform>
+#include <osg/Geometry>
 
 #include <components/nif/controlled.hpp>
 #include <components/nif/nifkey.hpp>
@@ -283,7 +284,7 @@ void Emitter::emitParticles(double dt)
 
         if (!visitor.mFound)
         {
-            std::cerr << "Emitter: Can't find emitter node" << randomRecIndex << std::endl;
+            std::cerr << "Error: Can't find emitter node" << randomRecIndex << std::endl;
             return;
         }
 
@@ -315,7 +316,22 @@ FindGroupByRecIndex::FindGroupByRecIndex(int recIndex)
 {
 }
 
-void FindGroupByRecIndex::apply(osg::Node &searchNode)
+void FindGroupByRecIndex::apply(osg::Node &node)
+{
+    applyNode(node);
+}
+
+void FindGroupByRecIndex::apply(osg::MatrixTransform &node)
+{
+    applyNode(node);
+}
+
+void FindGroupByRecIndex::apply(osg::Geometry &node)
+{
+    applyNode(node);
+}
+
+void FindGroupByRecIndex::applyNode(osg::Node &searchNode)
 {
     if (searchNode.getUserDataContainer() && searchNode.getUserDataContainer()->getNumUserObjects())
     {
@@ -372,6 +388,75 @@ void PlanarCollider::operate(osgParticle::Particle *particle, double dt)
             osg::Vec3 reflectedVelocity = particle->getVelocity() - mPlaneInParticleSpace.getNormal() * (2 * dotproduct);
             reflectedVelocity *= mBounceFactor;
             particle->setVelocity(reflectedVelocity);
+        }
+    }
+}
+
+SphericalCollider::SphericalCollider(const Nif::NiSphericalCollider* collider)
+    : mBounceFactor(collider->mBounceFactor),
+      mSphere(collider->mCenter, collider->mRadius)
+{
+}
+
+SphericalCollider::SphericalCollider()
+    : mBounceFactor(1.0f)
+{
+
+}
+
+SphericalCollider::SphericalCollider(const SphericalCollider& copy, const osg::CopyOp& copyop)
+    : osgParticle::Operator(copy, copyop)
+    , mBounceFactor(copy.mBounceFactor)
+    , mSphere(copy.mSphere)
+    , mSphereInParticleSpace(copy.mSphereInParticleSpace)
+{
+
+}
+
+void SphericalCollider::beginOperate(osgParticle::Program* program)
+{
+    mSphereInParticleSpace = mSphere;
+    if (program->getReferenceFrame() == osgParticle::ParticleProcessor::ABSOLUTE_RF)
+        mSphereInParticleSpace.center() = program->transformLocalToWorld(mSphereInParticleSpace.center());
+}
+
+void SphericalCollider::operate(osgParticle::Particle* particle, double dt)
+{
+    osg::Vec3f cent = (particle->getPosition() - mSphereInParticleSpace.center()); // vector from sphere center to particle
+
+    bool insideSphere = cent.length2() <= mSphereInParticleSpace.radius2();
+
+    if (insideSphere
+            || (cent * particle->getVelocity() < 0.0f)) // if outside, make sure the particle is flying towards the sphere
+    {
+        // Collision test (finding point of contact) is performed by solving a quadratic equation:
+        // ||vec(cent) + vec(vel)*k|| = R      /^2
+        // k^2 + 2*k*(vec(cent)*vec(vel))/||vec(vel)||^2 + (||vec(cent)||^2 - R^2)/||vec(vel)||^2 = 0
+
+        float b = -(cent * particle->getVelocity()) / particle->getVelocity().length2();
+
+        osg::Vec3f u = cent + particle->getVelocity() * b;
+
+        if (insideSphere
+                || (u.length2() < mSphereInParticleSpace.radius2()))
+        {
+            float d = (mSphereInParticleSpace.radius2() - u.length2()) / particle->getVelocity().length2();
+            float k = insideSphere ? (std::sqrt(d) + b) : (b - std::sqrt(d));
+
+            if (k < dt)
+            {
+                // collision detected; reflect off the tangent plane
+                osg::Vec3f contact = particle->getPosition() + particle->getVelocity() * k;
+
+                osg::Vec3 normal = (contact - mSphereInParticleSpace.center());
+                normal.normalize();
+
+                float dotproduct = particle->getVelocity() * normal;
+
+                osg::Vec3 reflectedVelocity = particle->getVelocity() - normal * (2 * dotproduct);
+                reflectedVelocity *= mBounceFactor;
+                particle->setVelocity(reflectedVelocity);
+            }
         }
     }
 }

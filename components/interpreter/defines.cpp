@@ -172,7 +172,7 @@ namespace Interpreter{
 
                         for(unsigned int j = 0; j < globals.size(); j++){
                             if(globals[j].length() > temp.length()){ // Just in case there's a global with a huuuge name
-                                std::string temp = text.substr(i+1, globals[j].length());
+                                temp = text.substr(i+1, globals[j].length());
                                 transform(temp.begin(), temp.end(), temp.begin(), ::tolower);
                             }
 
@@ -191,7 +191,7 @@ namespace Interpreter{
                 }
                 catch (std::exception& e)
                 {
-                    std::cerr << "Failed to replace escape character, with the following error: " << e.what() << std::endl;
+                    std::cerr << "Error: Failed to replace escape character, with the following error: " << e.what() << std::endl;
                     std::cerr << "Full text below: " << std::endl << text << std::endl;
                 }
 

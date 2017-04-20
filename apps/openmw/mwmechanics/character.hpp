@@ -6,12 +6,12 @@
 #include <components/esm/loadmgef.hpp>
 
 #include "../mwworld/ptr.hpp"
+#include "../mwworld/containerstore.hpp"
 
 #include "../mwrender/animation.hpp"
 
 namespace MWWorld
 {
-    class ContainerStoreIterator;
     class InventoryStore;
 }
 
@@ -199,7 +199,6 @@ class CharacterController : public MWRender::Animation::TextKeyListener
     bool mSwiftCasting;
 
     void setAttackTypeBasedOnMovement();
-    void setAttackTypeRandomly();
 
     void refreshCurrentAnims(CharacterState idle, CharacterState movement, JumpingState jump, bool force=false);
     void refreshHitRecoilAnims();
@@ -212,6 +211,8 @@ class CharacterController : public MWRender::Animation::TextKeyListener
     bool updateWeaponState();
     bool updateCreatureState();
     void updateIdleStormState(bool inwater);
+
+    void updateAnimQueue();
 
     void updateHeadTracking(float duration);
 
@@ -269,6 +270,8 @@ public:
 
     void setAttackingOrSpell(bool attackingOrSpell);
     void setSwiftCasting(bool swiftCasting);
+    void setAIAttackType(std::string attackType); // set and used by AiCombat
+    static void setAttackTypeRandomly(std::string& attackType);
 
     bool readyToPrepareAttack() const;
     bool readyToStartAttack() const;
@@ -280,6 +283,8 @@ public:
 
     /// Make this character turn its head towards \a target. To turn off head tracking, pass an empty Ptr.
     void setHeadTrackTarget(const MWWorld::ConstPtr& target);
+
+    void playSwishSound(float attackStrength);
 };
 
     MWWorld::ContainerStoreIterator getActiveWeapon(CreatureStats &stats, MWWorld::InventoryStore &inv, WeaponType *weaptype);

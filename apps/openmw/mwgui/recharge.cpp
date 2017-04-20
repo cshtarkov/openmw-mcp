@@ -5,11 +5,14 @@
 #include <MyGUI_ScrollView.h>
 #include <MyGUI_Gui.h>
 
+#include <components/widgets/box.hpp>
+
 #include <components/misc/rng.hpp>
 
 #include "../mwbase/world.hpp"
 #include "../mwbase/environment.hpp"
 #include "../mwbase/windowmanager.hpp"
+#include "../mwbase/soundmanager.hpp"
 
 #include "../mwworld/containerstore.hpp"
 #include "../mwworld/class.hpp"
@@ -21,6 +24,9 @@
 
 #include "widgets.hpp"
 #include "itemwidget.hpp"
+#include "itemchargeview.hpp"
+#include "sortfilteritemmodel.hpp"
+#include "inventoryitemmodel.hpp"
 
 namespace MWGui
 {
@@ -29,13 +35,15 @@ Recharge::Recharge()
     : WindowBase("openmw_recharge_dialog.layout")
 {
     getWidget(mBox, "Box");
-    getWidget(mView, "View");
     getWidget(mGemBox, "GemBox");
     getWidget(mGemIcon, "GemIcon");
     getWidget(mChargeLabel, "ChargeLabel");
     getWidget(mCancelButton, "CancelButton");
 
     mCancelButton->eventMouseButtonClick += MyGUI::newDelegate(this, &Recharge::onCancel);
+    mBox->eventItemClicked += MyGUI::newDelegate(this, &Recharge::onItemClicked);
+
+    mBox->setDisplayMode(ItemChargeView::DisplayMode_EnchantmentCharge);
 
     setVisible(false);
 }
@@ -43,8 +51,13 @@ Recharge::Recharge()
 void Recharge::open()
 {
     center();
+
+    SortFilterItemModel * model = new SortFilterItemModel(new InventoryItemModel(MWMechanics::getPlayer()));
+    model->setFilter(SortFilterItemModel::Filter_OnlyRechargable);
+    mBox->setModel(model);
+
     // Reset scrollbars
-    mView->setViewOffset(MyGUI::IntPoint(0, 0));
+    mBox->resetScrollbars();
 }
 
 void Recharge::exit()
@@ -56,7 +69,7 @@ void Recharge::start (const MWWorld::Ptr &item)
 {
     mGemIcon->setItem(item);
     mGemIcon->setUserString("ToolTipType", "ItemPtr");
-    mGemIcon->setUserData(item);
+    mGemIcon->setUserData(MWWorld::Ptr(item));
 
     updateView();
 }
@@ -72,66 +85,16 @@ void Recharge::updateView()
 
     bool toolBoxVisible = (gem.getRefData().getCount() != 0);
     mGemBox->setVisible(toolBoxVisible);
+    mGemBox->setUserString("Hidden", toolBoxVisible ? "false" : "true");
 
-    bool toolBoxWasVisible = (mBox->getPosition().top != mGemBox->getPosition().top);
+    mBox->update();
 
-    if (toolBoxVisible && !toolBoxWasVisible)
-    {
-        // shrink
-        mBox->setPosition(mBox->getPosition() + MyGUI::IntPoint(0, mGemBox->getSize().height));
-        mBox->setSize(mBox->getSize() - MyGUI::IntSize(0,mGemBox->getSize().height));
-    }
-    else if (!toolBoxVisible && toolBoxWasVisible)
-    {
-        // expand
-        mBox->setPosition(MyGUI::IntPoint (mBox->getPosition().left, mGemBox->getPosition().top));
-        mBox->setSize(mBox->getSize() + MyGUI::IntSize(0,mGemBox->getSize().height));
-    }
+    Gui::Box* box = dynamic_cast<Gui::Box*>(mMainWidget);
+    if (box == NULL)
+        throw std::runtime_error("main widget must be a box");
 
-    while (mView->getChildCount())
-        MyGUI::Gui::getInstance().destroyWidget(mView->getChildAt(0));
-
-    int currentY = 0;
-
-    MWWorld::Ptr player = MWMechanics::getPlayer();
-    MWWorld::ContainerStore& store = player.getClass().getContainerStore(player);
-    for (MWWorld::ContainerStoreIterator iter (store.begin());
-         iter!=store.end(); ++iter)
-    {
-        std::string enchantmentName = iter->getClass().getEnchantment(*iter);
-        if (enchantmentName.empty())
-            continue;
-        const ESM::Enchantment* enchantment = MWBase::Environment::get().getWorld()->getStore().get<ESM::Enchantment>().find(enchantmentName);
-        if (iter->getCellRef().getEnchantmentCharge() >= enchantment->mData.mCharge
-                || iter->getCellRef().getEnchantmentCharge() == -1)
-            continue;
-
-        MyGUI::TextBox* text = mView->createWidget<MyGUI::TextBox> (
-                    "SandText", MyGUI::IntCoord(8, currentY, mView->getWidth()-8, 18), MyGUI::Align::Default);
-        text->setCaption(iter->getClass().getName(*iter));
-        text->setNeedMouseFocus(false);
-        currentY += 19;
-
-        ItemWidget* icon = mView->createWidget<ItemWidget> (
-                    "MW_ItemIconSmall", MyGUI::IntCoord(16, currentY, 32, 32), MyGUI::Align::Default);
-        icon->setItem(*iter);
-        icon->setUserString("ToolTipType", "ItemPtr");
-        icon->setUserData(*iter);
-        icon->eventMouseButtonClick += MyGUI::newDelegate(this, &Recharge::onItemClicked);
-        icon->eventMouseWheel += MyGUI::newDelegate(this, &Recharge::onMouseWheel);
-
-        Widgets::MWDynamicStatPtr chargeWidget = mView->createWidget<Widgets::MWDynamicStat>
-                ("MW_ChargeBar", MyGUI::IntCoord(72, currentY+2, 199, 20), MyGUI::Align::Default);
-        chargeWidget->setValue(static_cast<int>(iter->getCellRef().getEnchantmentCharge()), enchantment->mData.mCharge);
-        chargeWidget->setNeedMouseFocus(false);
-
-        currentY += 32 + 4;
-    }
-
-    // Canvas size must be expressed with VScroll disabled, otherwise MyGUI would expand the scroll area when the scrollbar is hidden
-    mView->setVisibleVScroll(false);
-    mView->setCanvasSize (MyGUI::IntSize(mView->getWidth(), std::max(mView->getHeight(), currentY)));
-    mView->setVisibleVScroll(true);
+    box->notifyChildrenSizeChanged();
+    center();
 }
 
 void Recharge::onCancel(MyGUI::Widget *sender)
@@ -139,14 +102,12 @@ void Recharge::onCancel(MyGUI::Widget *sender)
     exit();
 }
 
-void Recharge::onItemClicked(MyGUI::Widget *sender)
+void Recharge::onItemClicked(MyGUI::Widget *sender, const MWWorld::Ptr& item)
 {
     MWWorld::Ptr gem = *mGemIcon->getUserData<MWWorld::Ptr>();
 
     if (!gem.getRefData().getCount())
         return;
-
-    MWWorld::Ptr item = *sender->getUserData<MWWorld::Ptr>();
 
     MWWorld::Ptr player = MWMechanics::getPlayer();
     MWMechanics::CreatureStats& stats = player.getClass().getCreatureStats(player);
@@ -177,9 +138,15 @@ void Recharge::onItemClicked(MyGUI::Widget *sender)
         item.getCellRef().setEnchantmentCharge(
             std::min(item.getCellRef().getEnchantmentCharge() + restored, static_cast<float>(enchantment->mData.mCharge)));
 
+        MWBase::Environment::get().getSoundManager()->playSound("Enchant Success",1,1);
+
         player.getClass().getContainerStore(player).restack(item);
 
         player.getClass().skillUsageSucceeded (player, ESM::Skill::Enchant, 0);
+    }
+    else
+    {
+        MWBase::Environment::get().getSoundManager()->playSound("Enchant Fail",1,1);
     }
 
     gem.getContainerStore()->remove(gem, 1, player);
@@ -196,14 +163,6 @@ void Recharge::onItemClicked(MyGUI::Widget *sender)
     }
 
     updateView();
-}
-
-void Recharge::onMouseWheel(MyGUI::Widget* _sender, int _rel)
-{
-    if (mView->getViewOffset().top + _rel*0.3f > 0)
-        mView->setViewOffset(MyGUI::IntPoint(0, 0));
-    else
-        mView->setViewOffset(MyGUI::IntPoint(0, static_cast<int>(mView->getViewOffset().top + _rel*0.3f)));
 }
 
 }

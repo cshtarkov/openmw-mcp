@@ -32,7 +32,7 @@ namespace MWWorld
          *              If it isn't new, non-looping VFX should not be played.
          * @param playSound Play effect sound?
          */
-        virtual void permanentEffectAdded (const ESM::MagicEffect *magicEffect, bool isNew, bool playSound) {}
+        virtual void permanentEffectAdded (const ESM::MagicEffect *magicEffect, bool isNew) {}
 
     };
 
@@ -115,6 +115,9 @@ namespace MWWorld
             virtual void storeEquipmentState (const MWWorld::LiveCellRefBase& ref, int index, ESM::InventoryState& inventory) const;
             virtual void readEquipmentState (const MWWorld::ContainerStoreIterator& iter, int index, const ESM::InventoryState& inventory);
 
+            bool canActorAutoEquip(const MWWorld::Ptr& actor, const MWWorld::Ptr& item);
+            ContainerStoreIterator findSlot (int slot) const;
+
         public:
 
             InventoryStore();
@@ -153,12 +156,16 @@ namespace MWWorld
             /// \note if no item selected, return end() iterator
 
             ContainerStoreIterator getSlot (int slot);
+            ConstContainerStoreIterator getSlot(int slot) const;
 
             void unequipAll(const MWWorld::Ptr& actor);
             ///< Unequip all currently equipped items.
 
             void autoEquip (const MWWorld::Ptr& actor);
             ///< Auto equip items according to stats and item value.
+
+            void autoEquipShield(const MWWorld::Ptr& actor);
+            ///< Auto-equip the shield with most health.
 
             const MWMechanics::MagicEffects& getMagicEffects() const;
             ///< Return magic effects from worn items.
@@ -167,10 +174,10 @@ namespace MWWorld
             ///< \attention This function is internal to the world model and should not be called from
             /// outside.
 
-            virtual bool stacks (const ConstPtr& ptr1, const ConstPtr& ptr2);
+            virtual bool stacks (const ConstPtr& ptr1, const ConstPtr& ptr2) const;
             ///< @return true if the two specified objects can stack with each other
 
-            virtual int remove(const Ptr& item, int count, const Ptr& actor);
+            virtual int remove(const Ptr& item, int count, const Ptr& actor, bool equipReplacement = true);
             ///< Remove \a count item(s) designated by \a item from this inventory.
             ///
             /// @return the number of items actually removed
@@ -197,10 +204,10 @@ namespace MWWorld
             /// in the slot (they can be re-stacked so its count may be different
             /// than the requested count).
 
-            void setListener (InventoryStoreListener* listener, const Ptr& actor);
+            void setInvListener (InventoryStoreListener* listener, const Ptr& actor);
             ///< Set a listener for various events, see \a InventoryStoreListener
 
-            InventoryStoreListener* getListener();
+            InventoryStoreListener* getInvListener();
 
             void visitEffectSources (MWMechanics::EffectSourceVisitor& visitor);
 

@@ -26,6 +26,8 @@ namespace MWClass
 
         virtual void insertObject(const MWWorld::Ptr& ptr, const std::string& model, MWPhysics::PhysicsSystem& physics) const;
 
+        virtual bool useAnim() const;
+
         virtual void block(const MWWorld::Ptr &ptr) const;
 
         virtual osg::Vec3f getRotationVector(const MWWorld::Ptr& ptr) const;
@@ -37,6 +39,10 @@ namespace MWClass
 
         virtual bool allowTelekinesis(const MWWorld::ConstPtr& ptr) const;
         ///< Return whether this class of object can be activated with telekinesis
+
+        virtual bool isActor() const;
+
+        virtual bool canBeActivated(const MWWorld::Ptr& ptr) const;
 
         // not implemented
         Actor(const Actor&);

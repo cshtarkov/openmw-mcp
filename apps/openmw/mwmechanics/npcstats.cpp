@@ -30,7 +30,7 @@ MWMechanics::NpcStats::NpcStats()
 , mBounty(0)
 , mWerewolfKills (0)
 , mLevelProgress(0)
-, mTimeToStartDrowning(20.0)
+, mTimeToStartDrowning(-1.0) // set breath to special value, it will be replaced during actor update
     , mIsWerewolf(false)
 {
     mSkillIncreases.resize (ESM::Attribute::Length, 0);
@@ -83,8 +83,8 @@ void MWMechanics::NpcStats::raiseRank(const std::string &faction)
     if (it != mFactionRank.end())
     {
         // Does the next rank exist?
-        const ESM::Faction* faction = MWBase::Environment::get().getWorld()->getStore().get<ESM::Faction>().find(lower);
-        if (it->second+1 < 10 && !faction->mRanks[it->second+1].empty())
+        const ESM::Faction* factionPtr = MWBase::Environment::get().getWorld()->getStore().get<ESM::Faction>().find(lower);
+        if (it->second+1 < 10 && !factionPtr->mRanks[it->second+1].empty())
             it->second += 1;
     }
 }

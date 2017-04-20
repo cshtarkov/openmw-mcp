@@ -256,7 +256,7 @@ namespace MWGui
                         std::string key = it->first.substr(0, underscorePos);
                         std::string widgetName = it->first.substr(underscorePos+1, it->first.size()-(underscorePos+1));
 
-                        std::string type = "Property";
+                        type = "Property";
                         size_t caretPos = key.find("^");
                         if (caretPos != std::string::npos)
                         {
@@ -414,10 +414,10 @@ namespace MWGui
 
         const MyGUI::IntPoint padding(8, 8);
 
-        const int maximumWidth = 500;
-
         const int imageCaptionHPadding = (caption != "" ? 8 : 0);
         const int imageCaptionVPadding = (caption != "" ? 4 : 0);
+
+        const int maximumWidth = MyGUI::RenderManager::getInstance().getViewSize().width - imageCaptionHPadding * 2;
 
         std::string realImage = MWBase::Environment::get().getWindowManager()->correctIconPath(image);
 
@@ -594,6 +594,14 @@ namespace MWGui
             return "\n" + prefix + ": " + toString(weight);
     }
 
+    std::string ToolTips::getPercentString(const float value, const std::string& prefix)
+    {
+        if (value == 0)
+            return "";
+        else
+            return "\n" + prefix + ": " + toString(value*100) +"%";
+    }
+
     std::string ToolTips::getValueString(const int value, const std::string& prefix)
     {
         if (value == 0)
@@ -735,9 +743,7 @@ namespace MWGui
 
         std::vector<std::string> abilities, powers, spells;
 
-        std::vector<std::string>::const_iterator it = sign->mPowers.mList.begin();
-        std::vector<std::string>::const_iterator end = sign->mPowers.mList.end();
-        for (; it != end; ++it)
+        for (std::vector<std::string>::const_iterator it = sign->mPowers.mList.begin(); it != sign->mPowers.mList.end(); ++it)
         {
             const std::string &spellId = *it;
             const ESM::Spell *spell = store.get<ESM::Spell>().search(spellId);

@@ -101,7 +101,6 @@ namespace MWClass
     {
         if(!model.empty())
             physics.addObject(ptr, model);
-        MWBase::Environment::get().getMechanicsManager()->add(ptr);
     }
 
     std::string Container::getModel(const MWWorld::ConstPtr &ptr) const
@@ -113,6 +112,11 @@ namespace MWClass
             return "meshes\\" + model;
         }
         return "";
+    }
+
+    bool Container::useAnim() const
+    {
+        return true;
     }
 
     boost::shared_ptr<MWWorld::Action> Container::activate (const MWWorld::Ptr& ptr,
@@ -136,7 +140,7 @@ namespace MWClass
         const std::string trapActivationSound = "Disarm Trap Fail";
 
         MWWorld::Ptr player = MWBase::Environment::get().getWorld ()->getPlayerPtr();
-        MWWorld::InventoryStore& invStore = player.getClass().getInventoryStore(player);
+        const MWWorld::InventoryStore& invStore = player.getClass().getInventoryStore(player);
 
         bool isLocked = ptr.getCellRef().getLockLevel() > 0;
         bool isTrapped = !ptr.getCellRef().getTrap().empty();
@@ -146,7 +150,7 @@ namespace MWClass
         // make key id lowercase
         std::string keyId = ptr.getCellRef().getKey();
         Misc::StringUtils::lowerCaseInPlace(keyId);
-        for (MWWorld::ContainerStoreIterator it = invStore.begin(); it != invStore.end(); ++it)
+        for (MWWorld::ConstContainerStoreIterator it = invStore.cbegin(); it != invStore.cend(); ++it)
         {
             std::string refId = it->getCellRef().getRefId();
             Misc::StringUtils::lowerCaseInPlace(refId);

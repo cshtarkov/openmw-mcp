@@ -83,7 +83,6 @@ void Repair::repair(const MWWorld::Ptr &itemToRepair)
     // tool used up?
     if (mTool.getCellRef().getCharge() == 0)
     {
-        MWWorld::Ptr player = getPlayer();
         MWWorld::ContainerStore& store = player.getClass().getContainerStore(player);
 
         store.remove(mTool, 1, player);
@@ -100,6 +99,9 @@ void Repair::repair(const MWWorld::Ptr &itemToRepair)
             if (Misc::StringUtils::ciEqual(iter->getCellRef().getRefId(), mTool.getCellRef().getRefId()))
             {
                 mTool = *iter;
+
+                MWBase::Environment::get().getSoundManager()->playSound("Item Repair Up",1,1);
+
                 break;
             }
         }

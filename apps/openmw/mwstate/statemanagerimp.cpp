@@ -249,7 +249,8 @@ void MWState::StateManager::saveGame (const std::string& description, const Slot
                 +MWBase::Environment::get().getScriptManager()->getGlobalScripts().countSavedGameRecords()
                 +MWBase::Environment::get().getDialogueManager()->countSavedGameRecords()
                 +MWBase::Environment::get().getWindowManager()->countSavedGameRecords()
-                +MWBase::Environment::get().getMechanicsManager()->countSavedGameRecords();
+                +MWBase::Environment::get().getMechanicsManager()->countSavedGameRecords()
+                +MWBase::Environment::get().getInputManager()->countSavedGameRecords();
         writer.setRecordCount (recordCount);
 
         writer.save (stream);
@@ -271,6 +272,7 @@ void MWState::StateManager::saveGame (const std::string& description, const Slot
         MWBase::Environment::get().getScriptManager()->getGlobalScripts().write (writer, listener);
         MWBase::Environment::get().getWindowManager()->write(writer, listener);
         MWBase::Environment::get().getMechanicsManager()->write(writer, listener);
+        MWBase::Environment::get().getInputManager()->write(writer, listener);
 
         // Ensure we have written the number of records that was estimated
         if (writer.getRecordCount() != recordCount+1) // 1 extra for TES3 record
@@ -462,10 +464,14 @@ void MWState::StateManager::loadGame (const Character *character, const std::str
                     MWBase::Environment::get().getMechanicsManager()->readRecord(reader, n.intval);
                     break;
 
+                case ESM::REC_INPU:
+                    MWBase::Environment::get().getInputManager()->readRecord(reader, n.intval);
+                    break;
+
                 default:
 
                     // ignore invalid records
-                    std::cerr << "Ignoring unknown record: " << n.toString() << std::endl;
+                    std::cerr << "Warning: Ignoring unknown record: " << n.toString() << std::endl;
                     reader.skipRecord();
             }
             int progressPercent = static_cast<int>(float(reader.getFileOffset())/total*100);
@@ -607,7 +613,7 @@ bool MWState::StateManager::verifyProfile(const ESM::SavedGame& profile) const
         if (std::find(selectedContentFiles.begin(), selectedContentFiles.end(), *it)
                 == selectedContentFiles.end())
         {
-            std::cerr << "Savegame dependency " << *it << " is missing." << std::endl;
+            std::cerr << "Warning: Savegame dependency " << *it << " is missing." << std::endl;
             notFound = true;
         }
     }
@@ -635,7 +641,7 @@ void MWState::StateManager::writeScreenshot(std::vector<char> &imageData) const
     osgDB::ReaderWriter* readerwriter = osgDB::Registry::instance()->getReaderWriterForExtension("jpg");
     if (!readerwriter)
     {
-        std::cerr << "Unable to write screenshot, can't find a jpg ReaderWriter" << std::endl;
+        std::cerr << "Error: Unable to write screenshot, can't find a jpg ReaderWriter" << std::endl;
         return;
     }
 
@@ -643,7 +649,7 @@ void MWState::StateManager::writeScreenshot(std::vector<char> &imageData) const
     osgDB::ReaderWriter::WriteResult result = readerwriter->writeImage(*screenshot, ostream);
     if (!result.success())
     {
-        std::cerr << "Unable to write screenshot: " << result.message() << " code " << result.status() << std::endl;
+        std::cerr << "Error: Unable to write screenshot: " << result.message() << " code " << result.status() << std::endl;
         return;
     }
 

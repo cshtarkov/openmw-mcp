@@ -213,7 +213,7 @@ namespace MWWorld
 
         MWWorld::Ptr player = getPlayer();
         const MWMechanics::NpcStats &playerStats = player.getClass().getNpcStats(player);
-        if (playerStats.isParalyzed() || playerStats.getKnockedDown())
+        if (playerStats.isParalyzed() || playerStats.getKnockedDown() || playerStats.isDead())
             return;
 
         MWWorld::Ptr toActivate = MWBase::Environment::get().getWorld()->getFacedObject();
@@ -221,7 +221,7 @@ namespace MWWorld
         if (toActivate.isEmpty())
             return;
 
-        if (toActivate.getClass().getName(toActivate) == "") // objects without name presented to user can never be activated
+        if (!toActivate.getClass().canBeActivated(toActivate))
             return;
 
         if (toActivate.getClass().isActor())
@@ -347,6 +347,12 @@ namespace MWWorld
                 throw std::runtime_error ("invalid player state record (object state)");
             }
 
+            if (!player.mObject.mEnabled)
+            {
+                std::cerr << "Warning: Savegame attempted to disable the player." << std::endl;
+                player.mObject.mEnabled = true;
+            }
+
             mPlayer.load (player.mObject);
 
             for (int i=0; i<ESM::Attribute::Length; ++i)
@@ -370,7 +376,7 @@ namespace MWWorld
             }
             catch (...)
             {
-                std::cerr << "Player cell '" << player.mCellId.mWorldspace << "' no longer exists" << std::endl;
+                std::cerr << "Warning: Player cell '" << player.mCellId.mWorldspace << "' no longer exists" << std::endl;
                 // Cell no longer exists. The loader will have to choose a default cell.
                 mCellStore = NULL;
             }

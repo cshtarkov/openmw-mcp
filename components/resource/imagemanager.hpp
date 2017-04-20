@@ -10,11 +10,6 @@
 
 #include "resourcemanager.hpp"
 
-namespace osgViewer
-{
-    class Viewer;
-}
-
 namespace osgDB
 {
     class Options;
@@ -36,6 +31,8 @@ namespace Resource
         osg::ref_ptr<osg::Image> getImage(const std::string& filename);
 
         osg::Image* getWarningImage();
+
+        void reportStats(unsigned int frameNumber, osg::Stats* stats) const;
 
     private:
         osg::ref_ptr<osg::Image> mWarningImage;

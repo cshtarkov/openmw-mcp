@@ -4,20 +4,18 @@ export CXX=clang++
 export CC=clang
 
 DEPENDENCIES_ROOT="/private/tmp/openmw-deps/openmw-deps"
-QT_PATH="/usr/local/opt/qt5"
+QT_PATH=`brew --prefix $macos_qt_formula`
 
 mkdir build
 cd build
 
 cmake \
--D CMAKE_EXE_LINKER_FLAGS="-lz" \
 -D CMAKE_PREFIX_PATH="$DEPENDENCIES_ROOT;$QT_PATH" \
 -D CMAKE_OSX_DEPLOYMENT_TARGET="10.8" \
--D CMAKE_OSX_SYSROOT="macosx10.11" \
--D CMAKE_BUILD_TYPE=Debug \
+-D CMAKE_OSX_SYSROOT="macosx10.12" \
+-D CMAKE_BUILD_TYPE=Release \
 -D OPENMW_OSX_DEPLOYMENT=TRUE \
 -D DESIRED_QT_VERSION=5 \
--D OSG_PLUGIN_LIB_SEARCH_PATH="$DEPENDENCIES_ROOT/lib/osgPlugins-3.4.0" \
 -D BUILD_ESMTOOL=FALSE \
 -D BUILD_MYGUI_PLUGIN=FALSE \
 -G"Unix Makefiles" \

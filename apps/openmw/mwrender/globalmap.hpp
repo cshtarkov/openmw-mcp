@@ -14,26 +14,28 @@ namespace osg
     class Camera;
 }
 
-namespace Loading
-{
-    class Listener;
-}
-
 namespace ESM
 {
     struct GlobalMap;
 }
 
+namespace SceneUtil
+{
+    class WorkQueue;
+}
+
 namespace MWRender
 {
+
+    class CreateMapWorkItem;
 
     class GlobalMap
     {
     public:
-        GlobalMap(osg::Group* root);
+        GlobalMap(osg::Group* root, SceneUtil::WorkQueue* workQueue);
         ~GlobalMap();
 
-        void render(Loading::Listener* loadingListener);
+        void render();
 
         int getWidth() const { return mWidth; }
         int getHeight() const { return mHeight; }
@@ -56,6 +58,8 @@ namespace MWRender
          */
         void cleanupCameras();
 
+        void removeCamera(osg::Camera* cam);
+
         /**
          * Mark a camera for cleanup in the next update. For internal use only.
          */
@@ -66,6 +70,8 @@ namespace MWRender
 
         osg::ref_ptr<osg::Texture2D> getBaseTexture();
         osg::ref_ptr<osg::Texture2D> getOverlayTexture();
+
+        void ensureLoaded();
 
     private:
         /**
@@ -105,6 +111,7 @@ namespace MWRender
         std::vector< std::pair<int,int> > mExploredCells;
 
         osg::ref_ptr<osg::Texture2D> mBaseTexture;
+        osg::ref_ptr<osg::Texture2D> mAlphaTexture;
 
         // GPU copy of overlay
         // Note, uploads are pushed through a Camera, instead of through mOverlayImage
@@ -112,6 +119,9 @@ namespace MWRender
 
         // CPU copy of overlay
         osg::ref_ptr<osg::Image> mOverlayImage;
+
+        osg::ref_ptr<SceneUtil::WorkQueue> mWorkQueue;
+        osg::ref_ptr<CreateMapWorkItem> mWorkItem;
 
         int mWidth;
         int mHeight;

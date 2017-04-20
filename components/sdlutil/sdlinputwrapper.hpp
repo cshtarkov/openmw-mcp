@@ -6,6 +6,7 @@
 #include <osg/ref_ptr>
 
 #include <SDL_events.h>
+#include <SDL_version.h>
 
 #include "OISCompat.hpp"
 #include "events.hpp"
@@ -30,7 +31,7 @@ namespace SDLUtil
         void setControllerEventCallback(ControllerListener* listen) { mConListener = listen; }
 
         void capture(bool windowEventsOnly);
-        bool isModifierHeld(SDL_Keymod mod);
+        bool isModifierHeld(int mod);
         bool isKeyDown(SDL_Scancode key);
 
         void setMouseVisible (bool visible);

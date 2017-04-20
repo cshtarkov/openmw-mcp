@@ -113,9 +113,29 @@ void MWWorld::ContainerStore::storeStates (const CellRefList<T>& collection,
 
 const std::string MWWorld::ContainerStore::sGoldId = "gold_001";
 
-MWWorld::ContainerStore::ContainerStore() : mCachedWeight (0), mWeightUpToDate (false) {}
+MWWorld::ContainerStore::ContainerStore() : mListener(NULL), mCachedWeight (0), mWeightUpToDate (false) {}
 
 MWWorld::ContainerStore::~ContainerStore() {}
+
+MWWorld::ConstContainerStoreIterator MWWorld::ContainerStore::cbegin (int mask) const
+{
+    return ConstContainerStoreIterator (mask, this);
+}
+
+MWWorld::ConstContainerStoreIterator MWWorld::ContainerStore::cend() const
+{
+    return ConstContainerStoreIterator (this);
+}
+
+MWWorld::ConstContainerStoreIterator MWWorld::ContainerStore::begin (int mask) const
+{
+    return cbegin(mask);
+}
+
+MWWorld::ConstContainerStoreIterator MWWorld::ContainerStore::end() const
+{
+    return cend();
+}
 
 MWWorld::ContainerStoreIterator MWWorld::ContainerStore::begin (int mask)
 {
@@ -134,6 +154,17 @@ int MWWorld::ContainerStore::count(const std::string &id)
         if (Misc::StringUtils::ciEqual(iter->getCellRef().getRefId(), id))
             total += iter->getRefData().getCount();
     return total;
+}
+
+MWWorld::ContainerStoreListener* MWWorld::ContainerStore::getContListener() const
+{
+    return mListener;
+}
+
+
+void MWWorld::ContainerStore::setContListener(MWWorld::ContainerStoreListener* listener)
+{
+    mListener = listener;
 }
 
 MWWorld::ContainerStoreIterator MWWorld::ContainerStore::unstack(const Ptr &ptr, const Ptr& container, int count)
@@ -178,7 +209,7 @@ MWWorld::ContainerStoreIterator MWWorld::ContainerStore::restack(const MWWorld::
     return retval;
 }
 
-bool MWWorld::ContainerStore::stacks(const ConstPtr& ptr1, const ConstPtr& ptr2)
+bool MWWorld::ContainerStore::stacks(const ConstPtr& ptr1, const ConstPtr& ptr2) const
 {
     const MWWorld::Class& cls1 = ptr1.getClass();
     const MWWorld::Class& cls2 = ptr2.getClass();
@@ -292,6 +323,9 @@ MWWorld::ContainerStoreIterator MWWorld::ContainerStore::add (const Ptr& itemPtr
             item.getRefData().getLocals().setVarByInt(script, "onpcadd", 1);
     }
 
+    if (mListener)
+        mListener->itemAdded(item, count);
+
     return it;
 }
 
@@ -364,13 +398,13 @@ MWWorld::ContainerStoreIterator MWWorld::ContainerStore::addNewStack (const Cons
     return it;
 }
 
-int MWWorld::ContainerStore::remove(const std::string& itemId, int count, const Ptr& actor)
+int MWWorld::ContainerStore::remove(const std::string& itemId, int count, const Ptr& actor, bool equipReplacement)
 {
     int toRemove = count;
 
     for (ContainerStoreIterator iter(begin()); iter != end() && toRemove > 0; ++iter)
         if (Misc::StringUtils::ciEqual(iter->getCellRef().getRefId(), itemId))
-            toRemove -= remove(*iter, toRemove, actor);
+            toRemove -= remove(*iter, toRemove, actor, equipReplacement);
 
     flagAsModified();
 
@@ -378,7 +412,7 @@ int MWWorld::ContainerStore::remove(const std::string& itemId, int count, const 
     return count - toRemove;
 }
 
-int MWWorld::ContainerStore::remove(const Ptr& item, int count, const Ptr& actor)
+int MWWorld::ContainerStore::remove(const Ptr& item, int count, const Ptr& actor, bool equipReplacement)
 {
     assert(this == item.getContainerStore());
 
@@ -397,6 +431,9 @@ int MWWorld::ContainerStore::remove(const Ptr& item, int count, const Ptr& actor
     }
 
     flagAsModified();
+
+    if (mListener)
+        mListener->itemRemoved(item, count - toRemove);
 
     // number of removed items
     return count - toRemove;
@@ -423,20 +460,20 @@ void MWWorld::ContainerStore::addInitialItem (const std::string& id, const std::
 
         if (ref.getPtr().getTypeName()==typeid (ESM::ItemLevList).name())
         {
-            const ESM::ItemLevList* levItem = ref.getPtr().get<ESM::ItemLevList>()->mBase;
+            const ESM::ItemLevList* levItemList = ref.getPtr().get<ESM::ItemLevList>()->mBase;
 
-            if (topLevel && std::abs(count) > 1 && levItem->mFlags & ESM::ItemLevList::Each)
+            if (topLevel && std::abs(count) > 1 && levItemList->mFlags & ESM::ItemLevList::Each)
             {
                 for (int i=0; i<std::abs(count); ++i)
-                    addInitialItem(id, owner, count > 0 ? 1 : -1, true, levItem->mId);
+                    addInitialItem(id, owner, count > 0 ? 1 : -1, true, levItemList->mId);
                 return;
             }
             else
             {
-                std::string id = MWMechanics::getLevelledItem(ref.getPtr().get<ESM::ItemLevList>()->mBase, false);
-                if (id.empty())
+                std::string itemId = MWMechanics::getLevelledItem(ref.getPtr().get<ESM::ItemLevList>()->mBase, false);
+                if (itemId.empty())
                     return;
-                addInitialItem(id, owner, count, false, levItem->mId);
+                addInitialItem(itemId, owner, count, false, levItemList->mId);
             }
         }
         else
@@ -459,7 +496,7 @@ void MWWorld::ContainerStore::addInitialItem (const std::string& id, const std::
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Error in MWWorld::ContainerStore::addInitialItem: " << e.what() << std::endl;
+        std::cerr << "Warning: MWWorld::ContainerStore::addInitialItem: " << e.what() << std::endl;
     }
 
 }
@@ -536,14 +573,14 @@ void MWWorld::ContainerStore::restock (const ESM::InventoryList& items, const MW
             if(listInMap != allowedForReplace.end())
                 restockNum -= std::min(restockNum, listInMap->second);
             //restock
-            addInitialItem(itemOrList, owner, restockNum, true);
+            addInitialItem(itemOrList, owner, -restockNum, true);
         }
         else
         {
             //Restocking static item - just restock to the max count
             int currentCount = count(itemOrList);
             if (currentCount < std::abs(it->mCount))
-                addInitialItem(itemOrList, owner, std::abs(it->mCount) - currentCount, true);
+                addInitialItem(itemOrList, owner, -(std::abs(it->mCount) - currentCount), true);
         }
     }
     flagAsModified();
@@ -759,10 +796,10 @@ void MWWorld::ContainerStore::readState (const ESM::InventoryState& inventory)
             case ESM::REC_WEAP: readEquipmentState (getState (weapons, state), thisIndex, inventory); break;
             case ESM::REC_LIGH: readEquipmentState (getState (lights, state), thisIndex, inventory); break;
             case 0:
-                std::cerr << "Dropping reference to '" << state.mRef.mRefID << "' (object no longer exists)" << std::endl;
+                std::cerr << "Warning: Dropping reference to '" << state.mRef.mRefID << "' (object no longer exists)" << std::endl;
                 break;
             default:
-                std::cerr << "Invalid item type in inventory state, refid " << state.mRef.mRefID << std::endl;
+                std::cerr << "Warning: Invalid item type in inventory state, refid " << state.mRef.mRefID << std::endl;
                 break;
         }
     }
@@ -771,53 +808,36 @@ void MWWorld::ContainerStore::readState (const ESM::InventoryState& inventory)
     mLevelledItemMap = inventory.mLevelledItemMap;
 }
 
-
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container)
-: mType (-1), mMask (0), mContainer (container)
-{}
-
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (int mask, ContainerStore *container)
-: mType (0), mMask (mask), mContainer (container)
+template<class PtrType>
+template<class T>
+void MWWorld::ContainerStoreIteratorBase<PtrType>::copy (const ContainerStoreIteratorBase<T>& src)
 {
-    nextType();
+    mType = src.mType;
+    mMask = src.mMask;
+    mContainer = src.mContainer;
+    mPtr = src.mPtr;
 
-    if (mType==-1 || (**this).getRefData().getCount())
-        return;
-
-    ++*this;
+    switch (src.mType)
+    {
+        case MWWorld::ContainerStore::Type_Potion: mPotion = src.mPotion; break;
+        case MWWorld::ContainerStore::Type_Apparatus: mApparatus = src.mApparatus; break;
+        case MWWorld::ContainerStore::Type_Armor: mArmor = src.mArmor; break;
+        case MWWorld::ContainerStore::Type_Book: mBook = src.mBook; break;
+        case MWWorld::ContainerStore::Type_Clothing: mClothing = src.mClothing; break;
+        case MWWorld::ContainerStore::Type_Ingredient: mIngredient = src.mIngredient; break;
+        case MWWorld::ContainerStore::Type_Light: mLight = src.mLight; break;
+        case MWWorld::ContainerStore::Type_Lockpick: mLockpick = src.mLockpick; break;
+        case MWWorld::ContainerStore::Type_Miscellaneous: mMiscellaneous = src.mMiscellaneous; break;
+        case MWWorld::ContainerStore::Type_Probe: mProbe = src.mProbe; break;
+        case MWWorld::ContainerStore::Type_Repair: mRepair = src.mRepair; break;
+        case MWWorld::ContainerStore::Type_Weapon: mWeapon = src.mWeapon; break;
+        case -1: break;
+        default: assert(0);
+    }
 }
 
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Potion>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Potion), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mPotion(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Apparatus>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Apparatus), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mApparatus(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Armor>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Armor), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mArmor(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Book>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Book), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mBook(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Clothing>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Clothing), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mClothing(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Ingredient>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Ingredient), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mIngredient(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Light>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Light), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mLight(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Lockpick>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Lockpick), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mLockpick(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Miscellaneous>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Miscellaneous), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mMiscellaneous(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Probe>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Probe), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mProbe(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Repair>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Repair), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mRepair(iterator){}
-MWWorld::ContainerStoreIterator::ContainerStoreIterator (ContainerStore *container, MWWorld::CellRefList<ESM::Weapon>::List::iterator iterator)
-    : mType(MWWorld::ContainerStore::Type_Weapon), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mWeapon(iterator){}
-
-MWWorld::ContainerStoreIterator::ContainerStoreIterator( const ContainerStoreIterator& src )
-{
-    copy(src);
-}
-
-void MWWorld::ContainerStoreIterator::incType()
+template<class PtrType>
+void MWWorld::ContainerStoreIteratorBase<PtrType>::incType()
 {
     if (mType==0)
         mType = 1;
@@ -830,7 +850,8 @@ void MWWorld::ContainerStoreIterator::incType()
     }
 }
 
-void MWWorld::ContainerStoreIterator::nextType()
+template<class PtrType>
+void MWWorld::ContainerStoreIteratorBase<PtrType>::nextType()
 {
     while (mType!=-1)
     {
@@ -842,7 +863,8 @@ void MWWorld::ContainerStoreIterator::nextType()
     }
 }
 
-bool MWWorld::ContainerStoreIterator::resetIterator()
+template<class PtrType>
+bool MWWorld::ContainerStoreIteratorBase<PtrType>::resetIterator()
 {
     switch (mType)
     {
@@ -910,7 +932,8 @@ bool MWWorld::ContainerStoreIterator::resetIterator()
     return false;
 }
 
-bool MWWorld::ContainerStoreIterator::incIterator()
+template<class PtrType>
+bool MWWorld::ContainerStoreIteratorBase<PtrType>::incIterator()
 {
     switch (mType)
     {
@@ -978,30 +1001,63 @@ bool MWWorld::ContainerStoreIterator::incIterator()
     return true;
 }
 
-MWWorld::Ptr *MWWorld::ContainerStoreIterator::operator->() const
+
+template<class PtrType>
+template<class T>
+bool MWWorld::ContainerStoreIteratorBase<PtrType>::isEqual (const ContainerStoreIteratorBase<T>& other) const
+{
+    if (mContainer!=other.mContainer)
+        return false;
+
+    if (mType!=other.mType)
+        return false;
+
+    switch (mType)
+    {
+        case ContainerStore::Type_Potion: return mPotion==other.mPotion;
+        case ContainerStore::Type_Apparatus: return mApparatus==other.mApparatus;
+        case ContainerStore::Type_Armor: return mArmor==other.mArmor;
+        case ContainerStore::Type_Book: return mBook==other.mBook;
+        case ContainerStore::Type_Clothing: return mClothing==other.mClothing;
+        case ContainerStore::Type_Ingredient: return mIngredient==other.mIngredient;
+        case ContainerStore::Type_Light: return mLight==other.mLight;
+        case ContainerStore::Type_Lockpick: return mLockpick==other.mLockpick;
+        case ContainerStore::Type_Miscellaneous: return mMiscellaneous==other.mMiscellaneous;
+        case ContainerStore::Type_Probe: return mProbe==other.mProbe;
+        case ContainerStore::Type_Repair: return mRepair==other.mRepair;
+        case ContainerStore::Type_Weapon: return mWeapon==other.mWeapon;
+        case -1: return true;
+    }
+
+    return false;  
+}
+
+template<class PtrType>
+PtrType *MWWorld::ContainerStoreIteratorBase<PtrType>::operator->() const
 {
     mPtr = **this;
     return &mPtr;
 }
 
-MWWorld::Ptr MWWorld::ContainerStoreIterator::operator*() const
+template<class PtrType>
+PtrType MWWorld::ContainerStoreIteratorBase<PtrType>::operator*() const
 {
-    Ptr ptr;
+    PtrType ptr;
 
     switch (mType)
     {
-        case ContainerStore::Type_Potion: ptr = MWWorld::Ptr (&*mPotion, 0); break;
-        case ContainerStore::Type_Apparatus: ptr = MWWorld::Ptr (&*mApparatus, 0); break;
-        case ContainerStore::Type_Armor: ptr = MWWorld::Ptr (&*mArmor, 0); break;
-        case ContainerStore::Type_Book: ptr = MWWorld::Ptr (&*mBook, 0); break;
-        case ContainerStore::Type_Clothing: ptr = MWWorld::Ptr (&*mClothing, 0); break;
-        case ContainerStore::Type_Ingredient: ptr = MWWorld::Ptr (&*mIngredient, 0); break;
-        case ContainerStore::Type_Light: ptr = MWWorld::Ptr (&*mLight, 0); break;
-        case ContainerStore::Type_Lockpick: ptr = MWWorld::Ptr (&*mLockpick, 0); break;
-        case ContainerStore::Type_Miscellaneous: ptr = MWWorld::Ptr (&*mMiscellaneous, 0); break;
-        case ContainerStore::Type_Probe: ptr = MWWorld::Ptr (&*mProbe, 0); break;
-        case ContainerStore::Type_Repair: ptr = MWWorld::Ptr (&*mRepair, 0); break;
-        case ContainerStore::Type_Weapon: ptr = MWWorld::Ptr (&*mWeapon, 0); break;
+        case ContainerStore::Type_Potion: ptr = PtrType (&*mPotion, 0); break;
+        case ContainerStore::Type_Apparatus: ptr = PtrType (&*mApparatus, 0); break;
+        case ContainerStore::Type_Armor: ptr = PtrType (&*mArmor, 0); break;
+        case ContainerStore::Type_Book: ptr = PtrType (&*mBook, 0); break;
+        case ContainerStore::Type_Clothing: ptr = PtrType (&*mClothing, 0); break;
+        case ContainerStore::Type_Ingredient: ptr = PtrType (&*mIngredient, 0); break;
+        case ContainerStore::Type_Light: ptr = PtrType (&*mLight, 0); break;
+        case ContainerStore::Type_Lockpick: ptr = PtrType (&*mLockpick, 0); break;
+        case ContainerStore::Type_Miscellaneous: ptr = PtrType (&*mMiscellaneous, 0); break;
+        case ContainerStore::Type_Probe: ptr = PtrType (&*mProbe, 0); break;
+        case ContainerStore::Type_Repair: ptr = PtrType (&*mRepair, 0); break;
+        case ContainerStore::Type_Weapon: ptr = PtrType (&*mWeapon, 0); break;
     }
 
     if (ptr.isEmpty())
@@ -1012,7 +1068,8 @@ MWWorld::Ptr MWWorld::ContainerStoreIterator::operator*() const
     return ptr;
 }
 
-MWWorld::ContainerStoreIterator& MWWorld::ContainerStoreIterator::operator++()
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>& MWWorld::ContainerStoreIteratorBase<PtrType>::operator++()
 {
     do
     {
@@ -1024,78 +1081,16 @@ MWWorld::ContainerStoreIterator& MWWorld::ContainerStoreIterator::operator++()
     return *this;
 }
 
-MWWorld::ContainerStoreIterator MWWorld::ContainerStoreIterator::operator++ (int)
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType> MWWorld::ContainerStoreIteratorBase<PtrType>::operator++ (int)
 {
-    ContainerStoreIterator iter (*this);
+    ContainerStoreIteratorBase<PtrType> iter (*this);
     ++*this;
     return iter;
 }
 
-bool MWWorld::ContainerStoreIterator::isEqual (const ContainerStoreIterator& iter) const
-{
-    if (mContainer!=iter.mContainer)
-        return false;
-
-    if (mType!=iter.mType)
-        return false;
-
-    switch (mType)
-    {
-        case ContainerStore::Type_Potion: return mPotion==iter.mPotion;
-        case ContainerStore::Type_Apparatus: return mApparatus==iter.mApparatus;
-        case ContainerStore::Type_Armor: return mArmor==iter.mArmor;
-        case ContainerStore::Type_Book: return mBook==iter.mBook;
-        case ContainerStore::Type_Clothing: return mClothing==iter.mClothing;
-        case ContainerStore::Type_Ingredient: return mIngredient==iter.mIngredient;
-        case ContainerStore::Type_Light: return mLight==iter.mLight;
-        case ContainerStore::Type_Lockpick: return mLockpick==iter.mLockpick;
-        case ContainerStore::Type_Miscellaneous: return mMiscellaneous==iter.mMiscellaneous;
-        case ContainerStore::Type_Probe: return mProbe==iter.mProbe;
-        case ContainerStore::Type_Repair: return mRepair==iter.mRepair;
-        case ContainerStore::Type_Weapon: return mWeapon==iter.mWeapon;
-        case -1: return true;
-    }
-
-    return false;
-}
-
-int MWWorld::ContainerStoreIterator::getType() const
-{
-    return mType;
-}
-
-const MWWorld::ContainerStore *MWWorld::ContainerStoreIterator::getContainerStore() const
-{
-    return mContainer;
-}
-
-void MWWorld::ContainerStoreIterator::copy(const ContainerStoreIterator& src)
-{
-    mType = src.mType;
-    mMask = src.mMask;
-    mContainer = src.mContainer;
-    mPtr = src.mPtr;
-
-    switch (mType)
-    {
-        case MWWorld::ContainerStore::Type_Potion: mPotion = src.mPotion; break;
-        case MWWorld::ContainerStore::Type_Apparatus: mApparatus = src.mApparatus; break;
-        case MWWorld::ContainerStore::Type_Armor: mArmor = src.mArmor; break;
-        case MWWorld::ContainerStore::Type_Book: mBook = src.mBook; break;
-        case MWWorld::ContainerStore::Type_Clothing: mClothing = src.mClothing; break;
-        case MWWorld::ContainerStore::Type_Ingredient: mIngredient = src.mIngredient; break;
-        case MWWorld::ContainerStore::Type_Light: mLight = src.mLight; break;
-        case MWWorld::ContainerStore::Type_Lockpick: mLockpick = src.mLockpick; break;
-        case MWWorld::ContainerStore::Type_Miscellaneous: mMiscellaneous = src.mMiscellaneous; break;
-        case MWWorld::ContainerStore::Type_Probe: mProbe = src.mProbe; break;
-        case MWWorld::ContainerStore::Type_Repair: mRepair = src.mRepair; break;
-        case MWWorld::ContainerStore::Type_Weapon: mWeapon = src.mWeapon; break;
-        case -1: break;
-        default: assert(0);
-    }
-}
-
-MWWorld::ContainerStoreIterator& MWWorld::ContainerStoreIterator::operator=( const ContainerStoreIterator& rhs )
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>& MWWorld::ContainerStoreIteratorBase<PtrType>::operator= (const ContainerStoreIteratorBase<PtrType>& rhs)
 {
     if (this!=&rhs)
     {
@@ -1104,12 +1099,108 @@ MWWorld::ContainerStoreIterator& MWWorld::ContainerStoreIterator::operator=( con
     return *this;
 }
 
-bool MWWorld::operator== (const ContainerStoreIterator& left, const ContainerStoreIterator& right)
+template<class PtrType>
+int MWWorld::ContainerStoreIteratorBase<PtrType>::getType() const
+{
+    return mType;
+}
+
+template<class PtrType>
+const MWWorld::ContainerStore *MWWorld::ContainerStoreIteratorBase<PtrType>::getContainerStore() const
+{
+    return mContainer;
+}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container)
+: mType (-1), mMask (0), mContainer (container)
+{}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (int mask, ContainerStoreType container)
+: mType (0), mMask (mask), mContainer (container)
+{
+    nextType();
+
+    if (mType==-1 || (**this).getRefData().getCount())
+        return;
+
+    ++*this;
+}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Potion>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Potion), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mPotion(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Apparatus>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Apparatus), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mApparatus(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Armor>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Armor), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mArmor(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Book>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Book), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mBook(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Clothing>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Clothing), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mClothing(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Ingredient>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Ingredient), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mIngredient(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Light>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Light), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mLight(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Lockpick>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Lockpick), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mLockpick(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Miscellaneous>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Miscellaneous), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mMiscellaneous(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Probe>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Probe), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mProbe(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Repair>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Repair), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mRepair(iterator){}
+
+template<class PtrType>
+MWWorld::ContainerStoreIteratorBase<PtrType>::ContainerStoreIteratorBase (ContainerStoreType container, typename Iterator<ESM::Weapon>::type iterator)
+    : mType(MWWorld::ContainerStore::Type_Weapon), mMask(MWWorld::ContainerStore::Type_All), mContainer(container), mWeapon(iterator){}
+
+
+template<class T, class U>
+bool MWWorld::operator== (const ContainerStoreIteratorBase<T>& left, const ContainerStoreIteratorBase<U>& right)
 {
     return left.isEqual (right);
 }
 
-bool MWWorld::operator!= (const ContainerStoreIterator& left, const ContainerStoreIterator& right)
+template<class T, class U>
+bool MWWorld::operator!= (const ContainerStoreIteratorBase<T>& left, const ContainerStoreIteratorBase<U>& right)
 {
     return !(left==right);
 }
+
+template class MWWorld::ContainerStoreIteratorBase<MWWorld::Ptr>;
+template class MWWorld::ContainerStoreIteratorBase<MWWorld::ConstPtr>;
+
+template bool MWWorld::operator== (const ContainerStoreIteratorBase<Ptr>& left, const ContainerStoreIteratorBase<Ptr>& right);
+template bool MWWorld::operator!= (const ContainerStoreIteratorBase<Ptr>& left, const ContainerStoreIteratorBase<Ptr>& right);
+template bool MWWorld::operator== (const ContainerStoreIteratorBase<ConstPtr>& left, const ContainerStoreIteratorBase<ConstPtr>& right);
+template bool MWWorld::operator!= (const ContainerStoreIteratorBase<ConstPtr>& left, const ContainerStoreIteratorBase<ConstPtr>& right);
+template bool MWWorld::operator== (const ContainerStoreIteratorBase<ConstPtr>& left, const ContainerStoreIteratorBase<Ptr>& right);
+template bool MWWorld::operator!= (const ContainerStoreIteratorBase<ConstPtr>& left, const ContainerStoreIteratorBase<Ptr>& right);
+template bool MWWorld::operator== (const ContainerStoreIteratorBase<Ptr>& left, const ContainerStoreIteratorBase<ConstPtr>& right);
+template bool MWWorld::operator!= (const ContainerStoreIteratorBase<Ptr>& left, const ContainerStoreIteratorBase<ConstPtr>& right);
+
+template void MWWorld::ContainerStoreIteratorBase<MWWorld::Ptr>::copy(const ContainerStoreIteratorBase<Ptr>& src);
+template void MWWorld::ContainerStoreIteratorBase<MWWorld::ConstPtr>::copy(const ContainerStoreIteratorBase<Ptr>& src);
+template void MWWorld::ContainerStoreIteratorBase<MWWorld::ConstPtr>::copy(const ContainerStoreIteratorBase<ConstPtr>& src);

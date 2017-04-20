@@ -1,6 +1,7 @@
 #include "aisequence.hpp"
 
 #include <limits>
+#include <iostream>
 
 #include <components/esm/aisequence.hpp>
 
@@ -74,6 +75,17 @@ bool AiSequence::getCombatTarget(MWWorld::Ptr &targetActor) const
     return !targetActor.isEmpty();
 }
 
+bool AiSequence::getCombatTargets(std::vector<MWWorld::Ptr> &targetActors) const
+{
+    for (std::list<AiPackage*>::const_iterator it = mPackages.begin(); it != mPackages.end(); ++it)
+    {
+        if ((*it)->getTypeId() == MWMechanics::AiPackage::TypeIdCombat)
+            targetActors.push_back((*it)->getTarget());
+    }
+
+    return !targetActors.empty();
+}
+
 std::list<AiPackage*>::const_iterator AiSequence::begin() const
 {
     return mPackages.begin();
@@ -91,8 +103,8 @@ std::list<AiPackage*>::const_iterator AiSequence::erase(std::list<AiPackage*>::c
     {
         if (package == it)
         {
-            AiPackage* package = *it;
-            delete package;
+            AiPackage* packagePtr = *it;
+            delete packagePtr;
             return mPackages.erase(it);
         }
     }
@@ -229,26 +241,33 @@ void AiSequence::execute (const MWWorld::Ptr& actor, CharacterController& charac
             }
         }
 
-        if (package->execute (actor,characterController,state,duration))
+        try
         {
-            // Put repeating noncombat AI packages on the end of the stack so they can be used again
-            if (isActualAiPackage(packageTypeId) && (mRepeat || package->getRepeat()))
+            if (package->execute (actor,characterController,state,duration))
             {
-                package->reset();
-                mPackages.push_back(package->clone());
+                // Put repeating noncombat AI packages on the end of the stack so they can be used again
+                if (isActualAiPackage(packageTypeId) && (mRepeat || package->getRepeat()))
+                {
+                    package->reset();
+                    mPackages.push_back(package->clone());
+                }
+                // To account for the rare case where AiPackage::execute() queued another AI package
+                // (e.g. AiPursue executing a dialogue script that uses startCombat)
+                std::list<MWMechanics::AiPackage*>::iterator toRemove =
+                        std::find(mPackages.begin(), mPackages.end(), package);
+                mPackages.erase(toRemove);
+                delete package;
+                if (isActualAiPackage(packageTypeId))
+                    mDone = true;
             }
-            // To account for the rare case where AiPackage::execute() queued another AI package
-            // (e.g. AiPursue executing a dialogue script that uses startCombat)
-            std::list<MWMechanics::AiPackage*>::iterator toRemove =
-                    std::find(mPackages.begin(), mPackages.end(), package);
-            mPackages.erase(toRemove);
-            delete package;
-            if (isActualAiPackage(packageTypeId))
-                mDone = true;
+            else
+            {
+                mDone = false;
+            }
         }
-        else
+        catch (std::exception& e)
         {
-            mDone = false;
+            std::cerr << "Error during AiSequence::execute: " << e.what() << std::endl;
         }
     }
 }
@@ -280,6 +299,10 @@ void AiSequence::stack (const AiPackage& package, const MWWorld::Ptr& actor)
                 static_cast<AiWander*>(*iter)->setReturnPosition(actor.getRefData().getPosition().asVec3());
         }
     }
+
+    // Stop combat when a non-combat AI package is added
+    if (isActualAiPackage(package.getTypeId()))
+        stopCombat();
 
     // remove previous packages if required
     if (package.shouldCancelPreviousAi())

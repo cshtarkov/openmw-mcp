@@ -25,7 +25,7 @@ endif()
 message(STATUS "Configuring OpenMW...")
 
 set(OPENMW_VERSION_MAJOR 0)
-set(OPENMW_VERSION_MINOR 39)
+set(OPENMW_VERSION_MINOR 41)
 set(OPENMW_VERSION_RELEASE 0)
 
 set(OPENMW_VERSION_COMMITHASH "")
@@ -35,17 +35,13 @@ set(OPENMW_VERSION "${OPENMW_VERSION_MAJOR}.${OPENMW_VERSION_MINOR}.${OPENMW_VER
 
 set(GIT_CHECKOUT FALSE)
 if(EXISTS ${PROJECT_SOURCE_DIR}/.git)
-    if(NOT EXISTS ${PROJECT_SOURCE_DIR}/.git/shallow)
-        find_package(Git)
+    find_package(Git)
 
-        if(GIT_FOUND)
-            set(GIT_CHECKOUT TRUE)
-        else(GIT_FOUND)
-            message(WARNING "Git executable not found")
-        endif(GIT_FOUND)
-    else(NOT EXISTS ${PROJECT_SOURCE_DIR}/.git/shallow)
-        message(STATUS "Shallow Git clone detected, not attempting to retrieve version info")
-    endif(NOT EXISTS ${PROJECT_SOURCE_DIR}/.git/shallow)
+    if(GIT_FOUND)
+        set(GIT_CHECKOUT TRUE)
+    else(GIT_FOUND)
+        message(WARNING "Git executable not found")
+    endif(GIT_FOUND)
 endif(EXISTS ${PROJECT_SOURCE_DIR}/.git)
 
 # Macros
@@ -96,7 +92,7 @@ endif()
 # Set up common paths
 if (APPLE)
     set(MORROWIND_DATA_FILES "./data" CACHE PATH "location of Morrowind data files")
-    set(OPENMW_RESOURCE_FILES "./resources" CACHE PATH "location of OpenMW resources files")
+    set(OPENMW_RESOURCE_FILES "../Resources/resources" CACHE PATH "location of OpenMW resources files")
 elseif(UNIX)
     # Paths
     SET(BINDIR "${CMAKE_INSTALL_PREFIX}/bin" CACHE PATH "Where to install binaries")
@@ -211,65 +207,27 @@ if(NOT HAVE_STDINT_H)
 endif()
 
 
-set(BOOST_COMPONENTS system filesystem program_options thread)
-if(WIN32)
-    set(BOOST_COMPONENTS ${BOOST_COMPONENTS} locale)
-endif(WIN32)
-
-IF(BOOST_STATIC)
-    set(Boost_USE_STATIC_LIBS   ON)
-endif()
-
 find_package(OpenSceneGraph 3.3.4 REQUIRED osgDB osgViewer osgText osgGA osgAnimation osgParticle osgUtil osgFX)
-
 include_directories(${OPENSCENEGRAPH_INCLUDE_DIRS})
 
+set(USED_OSG_PLUGINS
+                    osgdb_bmp
+                    osgdb_dds
+                    osgdb_jpeg
+                    osgdb_osg
+                    osgdb_png
+                    osgdb_serializers_osg
+                    osgdb_tga
+                  )
+
+get_filename_component(OSG_LIB_DIR ${OSGDB_LIBRARY} DIRECTORY)
+set(OSGPlugins_LIB_DIR "${OSG_LIB_DIR}/osgPlugins-${OPENSCENEGRAPH_VERSION}")
+
 if(OSG_STATIC)
-   macro(use_static_osg_plugin_library PLUGIN_NAME)
-      set(PLUGIN_NAME_DBG ${PLUGIN_NAME}d ${PLUGIN_NAME}D ${PLUGIN_NAME}_d ${PLUGIN_NAME}_D ${PLUGIN_NAME}_debug ${PLUGIN_NAME})
+    add_definitions(-DOSG_LIBRARY_STATIC)
 
-      # For now, users wishing to do a static build will need to pass the path to where the plugins reside
-      # More clever logic would need to deduce the path, probably installed under <OpenSceneGraph>/lib/osgPlugins-<X.X.X>
-      include(FindPkgMacros)
-      find_library(${PLUGIN_NAME}_LIBRARY_REL NAMES ${PLUGIN_NAME} HINTS ${OSG_PLUGIN_LIB_SEARCH_PATH})
-      find_library(${PLUGIN_NAME}_LIBRARY_DBG NAMES ${PLUGIN_NAME_DBG} HINTS ${OSG_PLUGIN_LIB_SEARCH_PATH})
-      make_library_set(${PLUGIN_NAME}_LIBRARY)
-
-      if("${${PLUGIN_NAME}_LIBRARY}" STREQUAL "")
-         message(FATAL_ERROR "Unable to find static OpenSceneGraph plugin: ${PLUGIN_NAME}")
-      endif()
-
-      set(OPENSCENEGRAPH_LIBRARIES ${OPENSCENEGRAPH_LIBRARIES} ${${PLUGIN_NAME}_LIBRARY})
-   endmacro()
-
-   add_definitions(-DOSG_LIBRARY_STATIC)
-
-   set(PLUGIN_LIST
-       osgdb_png # depends on libpng, zlib
-       osgdb_tga
-       osgdb_dds
-       osgdb_jpeg # depends on libjpeg
-       )
-
-   foreach(PLUGIN ${PLUGIN_LIST})
-      use_static_osg_plugin_library(${PLUGIN})
-   endforeach()
-
-   # OSG static plugins need to linked against their respective dependencies
-   set(PLUGIN_DEPS_LIST
-       PNG # needed by osgdb_png
-       ZLIB # needed by osgdb_png
-       JPEG # needed by osgdb_jpeg
-       )
-
-   macro(use_static_osg_plugin_dep DEPENDENCY)
-      find_package(${DEPENDENCY} REQUIRED)
-
-      set(OPENSCENEGRAPH_LIBRARIES ${OPENSCENEGRAPH_LIBRARIES} ${${DEPENDENCY}_LIBRARIES})
-   endmacro()
-   foreach(DEPENDENCY ${PLUGIN_DEPS_LIST})
-      use_static_osg_plugin_dep(${DEPENDENCY})
-   endforeach()
+    find_package(OSGPlugins REQUIRED COMPONENTS ${USED_OSG_PLUGINS})
+    list(APPEND OPENSCENEGRAPH_LIBRARIES ${OSGPlugins_LIBRARIES})
 endif()
 
 if(QT_STATIC)
@@ -282,26 +240,37 @@ if(QT_STATIC)
    endif()
 endif()
 
-find_package(MyGUI REQUIRED)
-if (${MYGUI_VERSION} VERSION_LESS "3.2.1")
-    message(FATAL_ERROR "OpenMW requires MyGUI 3.2.1 or later, please install the latest version from http://mygui.info")
+
+set(BOOST_COMPONENTS system filesystem program_options)
+if(WIN32)
+    set(BOOST_COMPONENTS ${BOOST_COMPONENTS} locale)
+endif(WIN32)
+
+IF(BOOST_STATIC)
+    set(Boost_USE_STATIC_LIBS   ON)
+endif()
+
+set(REQUIRED_BULLET_VERSION 286) # Bullet 286 required due to runtime bugfixes for btCapsuleShape
+if (DEFINED ENV{TRAVIS_BRANCH} OR DEFINED ENV{APPVEYOR})
+    set(REQUIRED_BULLET_VERSION 283) # but for build testing, 283 is fine
 endif()
 
 find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+find_package(MyGUI 3.2.1 REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(OpenAL REQUIRED)
-find_package(Bullet 283 REQUIRED COMPONENTS BulletCollision LinearMath)
+find_package(Bullet ${REQUIRED_BULLET_VERSION} REQUIRED COMPONENTS BulletCollision LinearMath)
 
 include_directories("."
     SYSTEM
     ${SDL2_INCLUDE_DIR}
     ${Boost_INCLUDE_DIR}
-    ${MYGUI_INCLUDE_DIRS}
+    ${MyGUI_INCLUDE_DIRS}
     ${OPENAL_INCLUDE_DIR}
     ${Bullet_INCLUDE_DIRS}
 )
 
-link_directories(${SDL2_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${MYGUI_LIB_DIR})
+link_directories(${SDL2_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS})
 
 if(MYGUI_STATIC)
    add_definitions(-DMYGUI_STATIC)
@@ -317,6 +286,11 @@ endif (APPLE)
 
 # Set up DEBUG define
 set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_DEBUG DEBUG=1)
+
+if (NOT APPLE)
+    set(OPENMW_MYGUI_FILES_ROOT ${OpenMW_BINARY_DIR})
+    set(OPENMW_SHADERS_ROOT ${OpenMW_BINARY_DIR})
+endif ()
 
 add_subdirectory(files/)
 
@@ -339,11 +313,15 @@ endif (APPLE)
 configure_file(${OpenMW_SOURCE_DIR}/files/settings-default.cfg
     "${OpenMW_BINARY_DIR}/settings-default.cfg")
 
-configure_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg.local
-    "${OpenMW_BINARY_DIR}/openmw.cfg")
-
-configure_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg
-    "${OpenMW_BINARY_DIR}/openmw.cfg.install")
+if (NOT APPLE)
+    configure_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg.local
+        "${OpenMW_BINARY_DIR}/openmw.cfg")
+    configure_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg
+        "${OpenMW_BINARY_DIR}/openmw.cfg.install")
+else ()
+    configure_file(${OpenMW_SOURCE_DIR}/files/openmw.cfg
+        "${OpenMW_BINARY_DIR}/openmw.cfg")
+endif ()
 
 configure_file(${OpenMW_SOURCE_DIR}/files/openmw-cs.cfg
     "${OpenMW_BINARY_DIR}/openmw-cs.cfg")
@@ -451,8 +429,10 @@ IF(NOT WIN32 AND NOT APPLE)
 ENDIF(NOT WIN32 AND NOT APPLE)
 
 if(WIN32)
-    FILE(GLOB dll_files "${OpenMW_BINARY_DIR}/Release/*.dll")
-    INSTALL(FILES ${dll_files} DESTINATION ".")
+    FILE(GLOB dll_files_debug "${OpenMW_BINARY_DIR}/Debug/*.dll")
+    FILE(GLOB dll_files_release "${OpenMW_BINARY_DIR}/Release/*.dll")
+    INSTALL(FILES ${dll_files_debug} DESTINATION "." CONFIGURATIONS Debug)
+    INSTALL(FILES ${dll_files_release} DESTINATION "." CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel)
     INSTALL(FILES "${OpenMW_BINARY_DIR}/openmw.cfg.install" DESTINATION "." RENAME "openmw.cfg")
     INSTALL(FILES "${OpenMW_SOURCE_DIR}/CHANGELOG.md" DESTINATION "." RENAME "CHANGELOG.txt")
     INSTALL(FILES "${OpenMW_SOURCE_DIR}/README.md" DESTINATION "." RENAME "README.txt")
@@ -461,32 +441,23 @@ if(WIN32)
         "${OpenMW_SOURCE_DIR}/Docs/license/DejaVu Font License.txt"
         "${OpenMW_BINARY_DIR}/settings-default.cfg"
         "${OpenMW_BINARY_DIR}/gamecontrollerdb.txt"
-        "${OpenMW_BINARY_DIR}/Release/openmw.exe"
         DESTINATION ".")
 
-    IF(BUILD_LAUNCHER)
-        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/openmw-launcher.exe" DESTINATION ".")
-    ENDIF(BUILD_LAUNCHER)
-    IF(BUILD_MWINIIMPORTER)
-        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/openmw-iniimporter.exe" DESTINATION ".")
-    ENDIF(BUILD_MWINIIMPORTER)
-    IF(BUILD_ESSIMPORTER)
-        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/openmw-essimporter.exe" DESTINATION ".")
-    ENDIF(BUILD_ESSIMPORTER)
-    IF(BUILD_OPENCS)
-        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/openmw-cs.exe" DESTINATION ".")
-        INSTALL(FILES "${OpenMW_BINARY_DIR}/openmw-cs.cfg" DESTINATION ".")
-    ENDIF(BUILD_OPENCS)
-    IF(BUILD_WIZARD)
-        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/openmw-wizard.exe" DESTINATION ".")
-    ENDIF(BUILD_WIZARD)
     if(BUILD_MYGUI_PLUGIN)
-        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/Plugin_MyGUI_OpenMW_Resources.dll" DESTINATION ".")
+        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Debug/Plugin_MyGUI_OpenMW_Resources.dll" DESTINATION "." CONFIGURATIONS Debug)
+        INSTALL(PROGRAMS "${OpenMW_BINARY_DIR}/Release/Plugin_MyGUI_OpenMW_Resources.dll" DESTINATION "." CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel)
     ENDIF(BUILD_MYGUI_PLUGIN)
 
+    IF(DESIRED_QT_VERSION MATCHES 5)
+        INSTALL(DIRECTORY "${OpenMW_BINARY_DIR}/Debug/platforms" DESTINATION "." CONFIGURATIONS Debug)
+        INSTALL(DIRECTORY "${OpenMW_BINARY_DIR}/Release/platforms" DESTINATION "." CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel)
+    ENDIF()
+
     INSTALL(DIRECTORY "${OpenMW_BINARY_DIR}/resources" DESTINATION ".")
-    FILE(GLOB plugin_dir "${OpenMW_BINARY_DIR}/Release/osgPlugins-*")
-    INSTALL(DIRECTORY ${plugin_dir} DESTINATION ".")
+    FILE(GLOB plugin_dir_debug "${OpenMW_BINARY_DIR}/Debug/osgPlugins-*")
+    FILE(GLOB plugin_dir_release "${OpenMW_BINARY_DIR}/Release/osgPlugins-*")
+    INSTALL(DIRECTORY ${plugin_dir_debug} DESTINATION "." CONFIGURATIONS Debug)
+    INSTALL(DIRECTORY ${plugin_dir_release} DESTINATION "." CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel)
 
     SET(CPACK_GENERATOR "NSIS")
     SET(CPACK_PACKAGE_NAME "OpenMW")
@@ -550,7 +521,7 @@ endif(WIN32)
 # Extern
 add_subdirectory (extern/osg-ffmpeg-videoplayer)
 add_subdirectory (extern/oics)
-if (USE_QT)
+if (BUILD_OPENCS)
     add_subdirectory (extern/osgQt)
 endif()
 
@@ -653,8 +624,14 @@ if (WIN32)
         4987 # nonstandard extension used (triggered by setjmp.h)
         4996 # Function was declared deprecated
 
+        # caused by OSG
+        4589 # Constructor of abstract class 'osg::Operation' ignores initializer for virtual base class 'osg::Referenced' (False warning)
+
         # caused by boost
         4191 # 'type cast' : unsafe conversion (1.56, thread_primitives.hpp, normally off)
+
+        # caused by MyGUI
+        4275 # non dll-interface class 'std::exception' used as base for dll-interface class 'MyGUI::Exception'
 
         # OpenMW specific warnings
         4099 # Type mismatch, declared class or struct is defined with other type
@@ -669,11 +646,19 @@ if (WIN32)
         4309 # Variable overflow, trying to store 128 in a signed char for example
         4351 # New behavior: elements of array 'array' will be default initialized (desired behavior)
         4355 # Using 'this' in member initialization list
+        4464 # relative include path contains '..'
         4505 # Unreferenced local function has been removed
         4701 # Potentially uninitialized local variable used
         4702 # Unreachable code
+        4714 # function 'QString QString::trimmed(void) &&' marked as __forceinline not inlined
         4800 # Boolean optimization warning, e.g. myBool = (myInt != 0) instead of myBool = myInt
         )
+
+    if (MSVC_VERSION GREATER 1800)
+        set(WARNINGS_DISABLE ${WARNINGS_DISABLE} 5026 5027
+            5031 # #pragma warning(pop): likely mismatch, popping warning state pushed in different file (config_begin.hpp, config_end.hpp)
+        )
+    endif()
 
     foreach(d ${WARNINGS_DISABLE})
         set(WARNINGS "${WARNINGS} /wd${d}")
@@ -707,7 +692,12 @@ if (WIN32)
     endif()
 
     if (BUILD_OPENMW)
-        set_target_properties(openmw PROPERTIES COMPILE_FLAGS "${WARNINGS} ${MT_BUILD}")
+        # Very specific issue this, only needed on 32-bit VS2015 during unity builds.
+        if (MSVC_VERSION GREATER 1800 AND CMAKE_SIZEOF_VOID_P EQUAL 4 AND OPENMW_UNITY_BUILD)
+            set_target_properties(openmw PROPERTIES COMPILE_FLAGS "${WARNINGS} ${MT_BUILD} /bigobj")
+        else()
+            set_target_properties(openmw PROPERTIES COMPILE_FLAGS "${WARNINGS} ${MT_BUILD}")
+        endif()
     endif()
 
     if (BUILD_WIZARD)
@@ -734,14 +724,7 @@ if (APPLE)
       configure_file("${QT_COCOA_PLUGIN_PATH}" "${OPENCS_BUNDLE_NAME}/Contents/MacOS/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}" COPYONLY)
     endif ()
 
-    set(INSTALL_SUBDIR OpenMW)
-
-    install(DIRECTORY "${APP_BUNDLE_DIR}" USE_SOURCE_PERMISSIONS DESTINATION "${INSTALL_SUBDIR}" COMPONENT Runtime)
-    install(DIRECTORY "${OpenMW_BINARY_DIR}/resources" DESTINATION "${INSTALL_SUBDIR}" COMPONENT Runtime)
-    install(FILES "${OpenMW_BINARY_DIR}/openmw.cfg.install" RENAME "openmw.cfg" DESTINATION "${INSTALL_SUBDIR}" COMPONENT Runtime)
-    install(FILES "${OpenMW_BINARY_DIR}/settings-default.cfg" DESTINATION "${INSTALL_SUBDIR}" COMPONENT Runtime)
-    install(FILES "${OpenMW_BINARY_DIR}/gamecontrollerdb.txt" DESTINATION "${INSTALL_SUBDIR}" COMPONENT Runtime)
-    install(FILES "${OpenMW_BINARY_DIR}/openmw-cs.cfg" DESTINATION "${INSTALL_SUBDIR}" COMPONENT Runtime)
+    install(DIRECTORY "${APP_BUNDLE_DIR}" USE_SOURCE_PERMISSIONS DESTINATION "." COMPONENT Runtime)
 
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_PACKAGE_VERSION ${OPENMW_VERSION})
@@ -749,8 +732,8 @@ if (APPLE)
     set(CPACK_PACKAGE_VERSION_MINOR ${OPENMW_VERSION_MINOR})
     set(CPACK_PACKAGE_VERSION_PATCH ${OPENMW_VERSION_RELEASE})
 
-    set(INSTALLED_OPENMW_APP "\${CMAKE_INSTALL_PREFIX}/${INSTALL_SUBDIR}/${APP_BUNDLE_NAME}")
-    set(INSTALLED_OPENCS_APP "\${CMAKE_INSTALL_PREFIX}/${INSTALL_SUBDIR}/${OPENCS_BUNDLE_NAME}")
+    set(INSTALLED_OPENMW_APP "\${CMAKE_INSTALL_PREFIX}/${APP_BUNDLE_NAME}")
+    set(INSTALLED_OPENCS_APP "\${CMAKE_INSTALL_PREFIX}/${OPENCS_BUNDLE_NAME}")
 
     install(CODE "
         set(BU_CHMOD_BUNDLE_ITEMS ON)
@@ -760,19 +743,16 @@ if (APPLE)
     " COMPONENT Runtime)
 
     set(ABSOLUTE_PLUGINS "")
-    set(USED_OSG_PLUGINS
-                        osgdb_dds
-                        osgdb_jpeg
-                        osgdb_png
-                        osgdb_tga
-                      )
 
     foreach (PLUGIN_NAME ${USED_OSG_PLUGINS})
-      set(PLUGIN_ABS "${OSG_PLUGIN_LIB_SEARCH_PATH}/${PLUGIN_NAME}.so")
+      set(PLUGIN_ABS "${OSGPlugins_LIB_DIR}/${PLUGIN_NAME}.so")
       set(ABSOLUTE_PLUGINS ${PLUGIN_ABS} ${ABSOLUTE_PLUGINS})
     endforeach ()
 
-    get_filename_component(OSG_PLUGIN_PREFIX_DIR "${OSG_PLUGIN_LIB_SEARCH_PATH}" NAME)
+    get_filename_component(OSG_PLUGIN_PREFIX_DIR "${OSGPlugins_LIB_DIR}" NAME)
+    if (NOT OSG_PLUGIN_PREFIX_DIR)
+      message(FATAL_ERROR "Can't get directory name for OSG plugins from '${OSGPlugins_LIB_DIR}'")
+    endif()
 
     # installs used plugins in bundle at given path (bundle_path must be relative to ${CMAKE_INSTALL_PREFIX})
     # and returns list of install paths for all installed plugins
@@ -797,8 +777,8 @@ if (APPLE)
         set(${plugins_var} ${PLUGINS} PARENT_SCOPE)
     endfunction (install_plugins_for_bundle)
 
-    install_plugins_for_bundle("${INSTALL_SUBDIR}/${APP_BUNDLE_NAME}" PLUGINS)
-    install_plugins_for_bundle("${INSTALL_SUBDIR}/${OPENCS_BUNDLE_NAME}" OPENCS_PLUGINS)
+    install_plugins_for_bundle("${APP_BUNDLE_NAME}" PLUGINS)
+    install_plugins_for_bundle("${OPENCS_BUNDLE_NAME}" OPENCS_PLUGINS)
 
     set(PLUGINS ${PLUGINS} "${INSTALLED_OPENMW_APP}/Contents/MacOS/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
     set(OPENCS_PLUGINS ${OPENCS_PLUGINS} "${INSTALLED_OPENCS_APP}/Contents/MacOS/${QT_COCOA_PLUGIN_GROUP}/${QT_COCOA_PLUGIN_NAME}")
@@ -840,3 +820,4 @@ if (DOXYGEN_FOUND)
         WORKING_DIRECTORY ${OpenMW_BINARY_DIR}
         COMMENT "Generating documentation for the github-pages at ${DOXYGEN_PAGES_OUTPUT_DIR}" VERBATIM)
 endif ()
+
